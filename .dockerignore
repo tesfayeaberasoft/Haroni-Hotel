@@ -1,0 +1,14 @@
+.git
+.github
+**/node_modules
+**/.output
+**/.tanstack
+**/.wrangler
+**/dist
+**/coverage
+**/.env
+**/.env.*
+!**/.env.example
+frontend/.lovable
+frontend/.cache
+*.log
