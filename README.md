@@ -140,17 +140,3 @@ Payments remain pending until verified, and verification cannot reduce debt belo
 ## Runtime limitations
 
 The supplied specification allows SMS **or** in-app reminders; this backend implements in-app notifications and does not integrate an SMS gateway. The SMS reminder setting stores a preference only and does not send messages. Receipt and report PDFs use a built-in writer and standard fonts; non-Latin text is transliterated where possible and otherwise replaced with placeholders. Excel exports are Excel-compatible XML workbooks (`.xls`), not OOXML `.xlsx`. The browser UI, SMS gateway, and managed backup scheduler are not included; configure the expiration and backup CLI jobs with the hosting platform's scheduler.
-
-## AletCloud single-app deployment
-
-The root `Dockerfile` packages the TanStack Start frontend and PHP API into one AletCloud app: Apache serves `/api` through PHP and proxies other requests to the frontend's Node server. This lets a single app use the free Solo app plan; it does not split the frontend and API into separate app instances.
-
-1. Connect this GitHub repository to AletCloud App Hosting and deploy from the repository root. The Dockerfile builds the frontend with Nitro's Node server preset and listens on the platform-provided `PORT`.
-2. Create a managed MySQL 8.0.16+ Solo database. Set `DB_DSN`, `DB_USERNAME`, and `DB_PASSWORD` in the app's environment using the database's connection details. `DB_DSN` must use the `mysql:host=...;port=...;dbname=...;charset=utf8mb4` PDO format. Do not commit credentials.
-3. Import `database/schema.sql` into the database AletCloud created. If the managed account is restricted to that database, omit the file's initial `CREATE DATABASE` and `USE haroni_dcms` statements when importing; the rest of the schema defines the tables and triggers.
-4. Run `backend/bin/create-first-admin.php` once in the app's PHP environment using the secure bootstrap procedure above. Do not put the bootstrap password in Git or deployment logs.
-5. Verify the app's `/api/health` endpoint and log in with the initial administrator. Configure a separate database backup account if using the in-app backup feature. This image writes downloaded backup files under `/tmp/dcms-backups`; those files are temporary and are not a substitute for off-platform backups.
-
-AletCloud's published Solo limits are one free app per account (250m CPU, 256 MiB memory, and 100 build minutes) and one free database (1 GiB storage, 10 connections, and no managed backups). The combined app may be resource-constrained, and the free database has no automatic backups. Treat this as a test deployment only until capacity and a tested backup/restore process are in place; do not rely on the free tier as the sole store for live financial records.
-
-The container does not schedule background jobs. Configure a recurring run of `php backend/bin/expire-pending.php` if AletCloud offers a scheduler for the app; otherwise pending confirmations will not be expired automatically.
