@@ -8,8 +8,11 @@ case "${PORT:-}" in
         ;;
 esac
 
+echo "Configuring Apache to listen on 0.0.0.0:${PORT}"
 sed -i "s/__PORT__/${PORT}/g" \
     /etc/apache2/ports.conf \
     /etc/apache2/sites-available/000-default.conf
+
+/usr/sbin/apache2ctl -t
 
 exec /usr/bin/supervisord -n -c /etc/supervisor/supervisord.conf
