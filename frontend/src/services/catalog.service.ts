@@ -26,7 +26,7 @@ export const catalogService = {
   },
   create: async (input: ServiceInput) => {
     if (USE_DEMO_BACKEND) return api.post<HotelService>("/services", input);
-    const response = await api.post<{ id: number; price_request_id: number }>("/service-catalog", {
+    const response = await api.post<{ id: number; price_request_id: number | null; status: string }>("/service-catalog", {
       category_id: await categoryId(input.category),
       name: input.name,
       price: input.price.toFixed(2),
@@ -35,9 +35,9 @@ export const catalogService = {
       id: String(response.id),
       name: input.name,
       category: input.category,
-      price: 0,
-      available: false,
-      proposedPrice: input.price,
+      price: response.status === "active" ? input.price : 0,
+      available: response.status === "active",
+      ...(response.price_request_id === null ? {} : { proposedPrice: input.price }),
       priceHistory: [],
     } satisfies HotelService;
   },

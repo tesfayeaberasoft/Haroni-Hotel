@@ -1,14 +1,20 @@
 import { useSuspenseQuery } from "@tanstack/react-query";
-import { createFileRoute } from "@tanstack/react-router";
 import { KeyRound, MoreHorizontal, Pencil, Plus, Power } from "lucide-react";
 import { useState } from "react";
 import { FormDialog, TextField } from "@/components/common/FormDialog";
+import {
+  PORTAL_MODAL_CONTENT_CLASS,
+  PORTAL_MODAL_OVERLAY_CLASS,
+  PORTAL_MODAL_SCROLL_CLASS,
+} from "@/components/common/modal-styles";
 import { PageHeader } from "@/components/common/PageHeader";
 import { TableShell } from "@/components/common/Panel";
 import { SearchInput } from "@/components/common/SearchInput";
+import { Spinner } from "@/components/common/States";
 import { AccountStatusBadge } from "@/components/common/StatusBadge";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -17,36 +23,32 @@ import { useAction } from "@/hooks/use-action";
 import { ROLE_LABEL, useAuth } from "@/hooks/use-auth";
 import { dateTime } from "@/lib/format";
 import { q } from "@/lib/queries";
-import { pageHead } from "@/lib/seo";
 import { usersService, type StaffInput } from "@/services/users.service";
 import { USE_DEMO_BACKEND } from "@/services/config";
 import type { AccountStatus, StaffUser } from "@/types";
 
-export const Route = createFileRoute("/_portal/admin/users")({
-  head: () => pageHead("User Management", "Create and manage staff accounts and roles."),
-  loader: ({ context }) => context.queryClient.ensureQueryData(q.users()),
-  component: UsersPage,
-});
-
 type StaffRole = StaffUser["role"];
 const ROLES: StaffRole[] = ["admin", "cashier", "finance"];
 
-function UsersPage() {
+export function UsersPage() {
   const { data: users } = useSuspenseQuery(q.users());
   const { session } = useAuth();
   const [search, setSearch] = useState("");
   const [editing, setEditing] = useState<StaffUser | "new" | null>(null);
   const [resetting, setResetting] = useState<StaffUser | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   const setStatus = useAction((v: { id: string; status: AccountStatus }) => usersService.setStatus(v.id, v.status), { success: "Account status updated." });
 
   const list = users.filter((u) => `${u.fullName} ${u.username} ${u.phone}`.toLowerCase().includes(search.toLowerCase()));
+  const selectedUser = users.find((user) => user.id === selectedId) ?? null;
+  const canManageSelected = selectedUser?.role !== "admin" || session?.user.role === "admin";
 
   return (
     <>
       <PageHeader
         eyebrow="Accounts"
         title="User management"
-        description="Cashier, Finance Manager and Administrator accounts. Guests are managed under Guest Accounts."
+        description="Manage Cashier, Finance Manager and Administrator staff accounts."
         actions={
           <Button onClick={() => setEditing("new")}>
             <Plus className="h-4 w-4" /> Add user
@@ -69,7 +71,19 @@ function UsersPage() {
           </TableHeader>
           <TableBody>
             {list.map((u) => (
-              <TableRow key={u.id}>
+              <TableRow
+                key={u.id}
+                className="cursor-pointer transition-colors hover:bg-muted/50"
+                tabIndex={0}
+                aria-label={`View details for ${u.fullName}`}
+                onClick={() => setSelectedId(u.id)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" || event.key === " ") {
+                    event.preventDefault();
+                    setSelectedId(u.id);
+                  }
+                }}
+              >
                 <TableCell className="font-semibold">{u.fullName}</TableCell>
                 <TableCell className="text-muted-foreground">@{u.username}</TableCell>
                 <TableCell className="whitespace-nowrap">{u.phone}</TableCell>
@@ -83,7 +97,7 @@ function UsersPage() {
                 <TableCell>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon" aria-label={`Actions for ${u.fullName}`}>
+                      <Button variant="ghost" size="icon" aria-label={`Actions for ${u.fullName}`} onClick={(event) => event.stopPropagation()}>
                         <MoreHorizontal className="h-4 w-4" />
                       </Button>
                     </DropdownMenuTrigger>
@@ -114,21 +128,106 @@ function UsersPage() {
           </TableBody>
         </Table>
       </TableShell>
-      {editing && <UserDialog user={editing === "new" ? null : editing} currentUserId={session?.user.id} onClose={() => setEditing(null)} />}
-      {resetting && <ResetPasswordDialog name={resetting.fullName} id={resetting.id} onClose={() => setResetting(null)} />}
+      {editing && <UserDialog user={editing === "new" ? null : editing} currentUserId={session?.user.id} nested={Boolean(selectedUser)} onClose={() => setEditing(null)} />}
+      {resetting && <ResetPasswordDialog name={resetting.fullName} id={resetting.id} nested={Boolean(selectedUser)} onClose={() => setResetting(null)} />}
+      <Dialog open={Boolean(selectedUser)} onOpenChange={(open) => !open && setSelectedId(null)}>
+        <DialogContent
+          overlayClassName={PORTAL_MODAL_OVERLAY_CLASS}
+          scrollAreaClassName={PORTAL_MODAL_SCROLL_CLASS}
+          className={PORTAL_MODAL_CONTENT_CLASS}
+        >
+          <DialogHeader>
+            <DialogTitle className="font-display text-xl">{selectedUser?.fullName}</DialogTitle>
+            <DialogDescription>Staff account details and available account actions.</DialogDescription>
+          </DialogHeader>
+          {selectedUser && (
+            <div className="space-y-4">
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="rounded-lg border bg-surface p-3">
+                  <div className="text-xs text-muted-foreground">Username</div>
+                  <div className="font-medium">@{selectedUser.username}</div>
+                </div>
+                <div className="rounded-lg border bg-surface p-3">
+                  <div className="text-xs text-muted-foreground">Phone</div>
+                  <div className="font-medium">{selectedUser.phone || "—"}</div>
+                </div>
+                <div className="rounded-lg border bg-surface p-3">
+                  <div className="text-xs text-muted-foreground">Role</div>
+                  <div className="font-medium">{ROLE_LABEL[selectedUser.role]}</div>
+                </div>
+                <div className="rounded-lg border bg-surface p-3">
+                  <div className="text-xs text-muted-foreground">Status</div>
+                  <AccountStatusBadge status={selectedUser.status} />
+                </div>
+                <div className="rounded-lg border bg-surface p-3">
+                  <div className="text-xs text-muted-foreground">Registered</div>
+                  <div className="font-medium">{dateTime(selectedUser.createdAt)}</div>
+                </div>
+                <div className="rounded-lg border bg-surface p-3">
+                  <div className="text-xs text-muted-foreground">Last sign-in</div>
+                  <div className="font-medium">{selectedUser.lastLoginAt ? dateTime(selectedUser.lastLoginAt) : "Not recorded"}</div>
+                </div>
+              </div>
+              {canManageSelected && (
+                <div className="flex flex-wrap gap-2 border-t pt-3">
+                  <Button size="sm" variant="outline" onClick={() => setEditing(selectedUser)}>
+                    <Pencil className="h-4 w-4" /> Edit details &amp; role
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={() => setResetting(selectedUser)}>
+                    <KeyRound className="h-4 w-4" /> Reset password
+                  </Button>
+                  {selectedUser.id !== session?.user.id && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={setStatus.isPending}
+                      onClick={() => setStatus.mutate({
+                        id: selectedUser.id,
+                        status: selectedUser.status === "active" ? "inactive" : "active",
+                      })}
+                    >
+                      {setStatus.isPending ? <Spinner className="h-4 w-4" /> : <Power className="h-4 w-4" />}
+                      {selectedUser.status === "active" ? "Deactivate" : "Activate"}
+                    </Button>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </>
   );
 }
 
-function UserDialog({ user, currentUserId, onClose }: { user: StaffUser | null; currentUserId: string | undefined; onClose: () => void }) {
+export function UserDialog({
+  user,
+  currentUserId,
+  onClose,
+  nested = false,
+  deep = false,
+}: {
+  user: StaffUser | null;
+  currentUserId: string | undefined;
+  onClose: () => void;
+  nested?: boolean;
+  deep?: boolean;
+}) {
+  const { session } = useAuth();
   const [f, setF] = useState<StaffInput>({ fullName: user?.fullName ?? "", username: user?.username ?? "", phone: user?.phone ?? "", role: user?.role ?? "cashier", password: "" });
-  const availableRoles = user ? ROLES : USE_DEMO_BACKEND ? ROLES : ROLES.filter((role) => role !== "admin");
+  const availableRoles = session?.user.role === "finance"
+    ? ROLES.filter((role) => role !== "admin")
+    : user
+      ? ROLES
+      : USE_DEMO_BACKEND
+        ? ROLES
+        : ROLES.filter((role) => role !== "admin");
   const save = useAction(
     () => (user ? usersService.update(user.id, { fullName: f.fullName, phone: f.phone, role: f.role }) : usersService.create(f)),
     { success: user ? "User updated." : "User created.", onSuccess: onClose },
   );
   return (
-    <FormDialog open onOpenChange={(o) => !o && onClose()} title={user ? "Edit user" : "Add staff user"} submitLabel={user ? "Save changes" : "Create user"} pending={save.isPending} onSubmit={() => save.mutate(undefined)}>
+    <FormDialog open nested={nested} deep={deep} onOpenChange={(o) => !o && onClose()} title={user ? "Edit user" : "Add staff user"} submitLabel={user ? "Save changes" : "Create user"} pending={save.isPending} onSubmit={() => save.mutate(undefined)}>
       <TextField id="fullName" label="Full name" required value={f.fullName} onChange={(v) => setF({ ...f, fullName: v })} />
       <div className="grid gap-4 sm:grid-cols-2">
         <TextField id="username" label="Username" required value={f.username} disabled={Boolean(user)} onChange={(v) => setF({ ...f, username: v })} />
@@ -154,7 +253,19 @@ function UserDialog({ user, currentUserId, onClose }: { user: StaffUser | null; 
   );
 }
 
-export function ResetPasswordDialog({ id, name, onClose }: { id: string; name: string; onClose: () => void }) {
+export function ResetPasswordDialog({
+  id,
+  name,
+  onClose,
+  nested = false,
+  deep = false,
+}: {
+  id: string;
+  name: string;
+  onClose: () => void;
+  nested?: boolean;
+  deep?: boolean;
+}) {
   const [pw, setPw] = useState("");
   const [temporaryPassword, setTemporaryPassword] = useState("");
   const reset = useAction(() => usersService.resetPassword(id, pw), {
@@ -165,7 +276,7 @@ export function ResetPasswordDialog({ id, name, onClose }: { id: string; name: s
     },
   });
   return (
-    <FormDialog open onOpenChange={(o) => !o && onClose()} title="Reset password" description={`Set a new password for ${name}.`} submitLabel={temporaryPassword ? "Done" : USE_DEMO_BACKEND ? "Reset password" : "Generate temporary password"} pending={reset.isPending} onSubmit={() => temporaryPassword ? onClose() : reset.mutate(undefined)}>
+    <FormDialog open nested={nested} deep={deep} onOpenChange={(o) => !o && onClose()} title="Reset password" description={`Set a new password for ${name}.`} submitLabel={temporaryPassword ? "Done" : USE_DEMO_BACKEND ? "Reset password" : "Generate temporary password"} pending={reset.isPending} onSubmit={() => temporaryPassword ? onClose() : reset.mutate(undefined)}>
       {USE_DEMO_BACKEND && <TextField id="newpw" label="New password" type="password" required value={pw} onChange={setPw} hint="At least 6 characters." />}
       {temporaryPassword && <p className="rounded-md border bg-surface p-3 font-mono text-sm break-all">{temporaryPassword}</p>}
     </FormDialog>

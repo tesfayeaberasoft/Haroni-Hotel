@@ -7,8 +7,8 @@ import { readSession, UNAUTHORIZED_EVENT, writeSession } from "@/services/sessio
 import type { AuthSession, Role } from "@/types";
 import { toast } from "sonner";
 
-export const ROLE_HOME: Record<Role, "/admin" | "/cashier" | "/finance" | "/guest"> = {
-  admin: "/admin",
+export const ROLE_HOME: Record<Role, "/" | "/cashier" | "/finance" | "/guest"> = {
+  admin: "/",
   cashier: "/cashier",
   finance: "/finance",
   guest: "/guest",

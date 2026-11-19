@@ -1,6 +1,13 @@
 import type { ReactNode } from "react";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
@@ -16,6 +23,8 @@ export function FormDialog({
   onSubmit,
   children,
   wide = false,
+  nested = false,
+  deep = false,
 }: {
   open: boolean;
   onOpenChange: (o: boolean) => void;
@@ -26,17 +35,29 @@ export function FormDialog({
   onSubmit: () => void;
   children: ReactNode;
   wide?: boolean;
+  nested?: boolean;
+  deep?: boolean;
 }) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className={cn("max-h-[92vh] overflow-y-auto border-primary/20 bg-popover", wide ? "sm:max-w-2xl" : "sm:max-w-lg")}>
+      <DialogContent
+        overlayClassName={
+          deep ? "z-[80] md:top-16 lg:left-72" : nested ? "z-[60] md:top-16 lg:left-72" : undefined
+        }
+        className={cn(
+          "max-h-[82dvh] border-primary/20 bg-popover",
+          wide ? "sm:max-w-2xl" : "sm:max-w-xl",
+          nested && "z-[70]",
+          deep && "z-[90]",
+        )}
+      >
         <DialogHeader>
-          <DialogTitle className="font-display text-2xl">{title}</DialogTitle>
+          <DialogTitle className="font-display text-xl">{title}</DialogTitle>
           {description && <DialogDescription>{description}</DialogDescription>}
         </DialogHeader>
         <form
           id="form-dialog"
-          className="space-y-4"
+          className="space-y-3"
           onSubmit={(e) => {
             e.preventDefault();
             onSubmit();
@@ -45,10 +66,10 @@ export function FormDialog({
           {children}
         </form>
         <DialogFooter>
-          <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={pending}>
+          <Button variant="ghost" size="sm" onClick={() => onOpenChange(false)} disabled={pending}>
             Cancel
           </Button>
-          <Button type="submit" form="form-dialog" disabled={pending}>
+          <Button type="submit" size="sm" form="form-dialog" disabled={pending}>
             {pending && <Spinner className="h-4 w-4 text-current" />} {submitLabel}
           </Button>
         </DialogFooter>
@@ -83,7 +104,7 @@ export function TextField({
   inputMode?: React.HTMLAttributes<HTMLInputElement>["inputMode"];
 }) {
   return (
-    <div className={cn("space-y-2", className)}>
+    <div className={cn("space-y-1.5", className)}>
       <Label htmlFor={id}>
         {label} {required && <span className="text-destructive">*</span>}
       </Label>
@@ -95,7 +116,7 @@ export function TextField({
         {...(placeholder ? { placeholder } : {})}
         {...(disabled ? { disabled } : {})}
         {...(inputMode ? { inputMode } : {})}
-        className="bg-surface"
+        className="h-9 bg-surface"
       />
       {hint && <p className="text-xs text-muted-foreground">{hint}</p>}
     </div>

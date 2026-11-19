@@ -1,9 +1,18 @@
-import type { ReactNode } from "react";
+import type { HTMLAttributes, ReactNode } from "react";
 import { cn } from "@/lib/utils";
 
-export function Panel({ className, children, delay = 0 }: { className?: string; children: ReactNode; delay?: number }) {
+export function Panel({
+  className,
+  children,
+  delay = 0,
+  ...props
+}: Omit<HTMLAttributes<HTMLElement>, "children"> & { children: ReactNode; delay?: number }) {
   return (
-    <section className={cn("rounded-xl border bg-card p-5 shadow-card animate-fade-up sm:p-6", className)} style={{ animationDelay: `${delay}ms` }}>
+    <section
+      {...props}
+      className={cn("rounded-xl border bg-card p-5 shadow-card animate-fade-up sm:p-6", className)}
+      style={{ ...props.style, animationDelay: `${delay}ms` }}
+    >
       {children}
     </section>
   );

@@ -77,6 +77,21 @@ final class NotificationService
         }
     }
 
+    public function deleteFor(int $notificationId, int $userId): void
+    {
+        $query = $this->pdo->prepare('DELETE FROM notifications WHERE id = ? AND user_id = ?');
+        $query->execute([$notificationId, $userId]);
+        if ($query->rowCount() === 0) {
+            throw new ApiException(404, 'Notification not found.');
+        }
+    }
+
+    public function deleteAllFor(int $userId): void
+    {
+        $query = $this->pdo->prepare('DELETE FROM notifications WHERE user_id = ?');
+        $query->execute([$userId]);
+    }
+
     public static function transaction(PDO $pdo, int $guestId, int $transactionId, string $type, string $eventKey, string $message): void
     {
         $query = $pdo->prepare(

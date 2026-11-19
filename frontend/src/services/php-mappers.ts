@@ -177,7 +177,7 @@ export function mapPhpGuest(row: PhpRow): Guest {
     fullName: phpText(row.full_name ?? row.guest),
     phone: phpText(row.phone),
     username: phpText(row.username),
-    status: row.status === "inactive" || row.is_active === false || row.is_active === 0 ? "inactive" : "active",
+    status: row.status === "inactive" || (row.is_active !== undefined && !phpBool(row.is_active)) ? "inactive" : "active",
     creditLimit: phpNumber(row.credit_limit),
     createdAt: phpDate(row.created_at),
   };

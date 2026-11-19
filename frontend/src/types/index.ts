@@ -62,7 +62,7 @@ export interface HotelService {
   category: ServiceCategory;
   price: number;
   available: boolean;
-  /** A catalog price proposed by the Administrator that awaits Finance approval. */
+  /** A proposed catalog price that awaits Finance approval. */
   proposedPrice?: number | undefined;
   priceHistory: { price: number; effectiveFrom: string; approvedBy: string }[];
 }

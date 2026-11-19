@@ -1,6 +1,6 @@
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
-import { Check, FileUp, Plus, X } from "lucide-react";
+import { FileUp, Plus } from "lucide-react";
 import { useRef, useState } from "react";
 import { toast } from "sonner";
 import { FormDialog, TextField } from "@/components/common/FormDialog";
@@ -10,14 +10,22 @@ import { Panel, TableShell } from "@/components/common/Panel";
 import { StatCard } from "@/components/common/StatCard";
 import { EmptyState } from "@/components/common/States";
 import { HistoricalStatusBadge } from "@/components/common/StatusBadge";
+import { HistoricalRecordDetailDialog } from "@/components/finance/HistoricalViews";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAction } from "@/hooks/use-action";
 import { parseHistoricalCsv } from "@/lib/csv";
-import { date, money, moneyCompact } from "@/lib/format";
+import { money, moneyCompact } from "@/lib/format";
 import { q } from "@/lib/queries";
 import { pageHead } from "@/lib/seo";
 import { historicalService } from "@/services/finance.service";
@@ -25,8 +33,16 @@ import type { HistoricalDebt, HistoricalStatus } from "@/types";
 import { BadgeCheck, Hourglass, Landmark, Scale } from "lucide-react";
 
 export const Route = createFileRoute("/_portal/finance/historical")({
-  head: () => pageHead("Historical Debt", "Move earlier paper debt records into the system and reconcile them."),
-  loader: ({ context }) => Promise.all([context.queryClient.ensureQueryData(q.historical()), context.queryClient.ensureQueryData(q.reconciliation())]),
+  head: () =>
+    pageHead(
+      "Historical Debt",
+      "Move earlier paper debt records into the system and reconcile them.",
+    ),
+  loader: ({ context }) =>
+    Promise.all([
+      context.queryClient.ensureQueryData(q.historical()),
+      context.queryClient.ensureQueryData(q.reconciliation()),
+    ]),
   component: HistoricalPage,
 });
 
@@ -35,12 +51,19 @@ function HistoricalPage() {
   const { data: r } = useSuspenseQuery(q.reconciliation());
   const [tab, setTab] = useState<HistoricalStatus | "all">("pending_verification");
   const [adding, setAdding] = useState(false);
-  const [importResult, setImportResult] = useState<{ created: number; errors: string[] } | null>(null);
+  const [selectedRecord, setSelectedRecord] = useState<HistoricalDebt | null>(null);
+  const [importResult, setImportResult] = useState<{ created: number; errors: string[] } | null>(
+    null,
+  );
   const fileRef = useRef<HTMLInputElement>(null);
-  const importRows = useAction((rows: ReturnType<typeof parseHistoricalCsv>) => historicalService.importRows(rows), {
-    success: (res) => `${res.created} record${res.created === 1 ? "" : "s"} imported for verification.`,
-    onSuccess: setImportResult,
-  });
+  const importRows = useAction(
+    (rows: ReturnType<typeof parseHistoricalCsv>) => historicalService.importRows(rows),
+    {
+      success: (res) =>
+        `${res.created} record${res.created === 1 ? "" : "s"} imported for verification.`,
+      onSuccess: setImportResult,
+    },
+  );
   const rows = records.filter((h) => tab === "all" || h.status === tab);
   const pct = r.target > 0 ? Math.min(100, (r.approved / r.target) * 100) : 0;
 
@@ -60,8 +83,19 @@ function HistoricalPage() {
         description="Debt from the earlier paper records becomes each guest's opening balance once you verify it."
         actions={
           <>
-            <input ref={fileRef} type="file" accept=".csv,text/csv" className="hidden" aria-label="CSV file" onChange={(e) => void onFile(e.target.files?.[0])} />
-            <Button variant="outline" onClick={() => fileRef.current?.click()} disabled={importRows.isPending}>
+            <input
+              ref={fileRef}
+              type="file"
+              accept=".csv,text/csv"
+              className="hidden"
+              aria-label="CSV file"
+              onChange={(e) => void onFile(e.target.files?.[0])}
+            />
+            <Button
+              variant="outline"
+              onClick={() => fileRef.current?.click()}
+              disabled={importRows.isPending}
+            >
               <FileUp className="h-4 w-4" /> Import CSV
             </Button>
             <Button onClick={() => setAdding(true)}>
@@ -71,10 +105,38 @@ function HistoricalPage() {
         }
       />
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard label="Target from paper records" value={moneyCompact(r.target)} hint={money(r.target)} icon={Landmark} tone="muted" />
-        <StatCard label="Verified opening balances" value={moneyCompact(r.approved)} hint={`${pct.toFixed(1)}% of target`} icon={BadgeCheck} tone="success" delay={40} highlight />
-        <StatCard label="Awaiting verification" value={moneyCompact(r.pending)} hint={money(r.pending)} icon={Hourglass} tone="warning" delay={80} />
-        <StatCard label="Difference to target" value={moneyCompact(r.difference)} hint={`${r.records} records · ${money(r.rejected)} rejected`} icon={Scale} tone={Math.abs(r.difference) < 1 ? "success" : "info"} delay={120} />
+        <StatCard
+          label="Target from paper records"
+          value={moneyCompact(r.target)}
+          hint={money(r.target)}
+          icon={Landmark}
+          tone="muted"
+        />
+        <StatCard
+          label="Verified opening balances"
+          value={moneyCompact(r.approved)}
+          hint={`${pct.toFixed(1)}% of target`}
+          icon={BadgeCheck}
+          tone="success"
+          delay={40}
+          highlight
+        />
+        <StatCard
+          label="Awaiting verification"
+          value={moneyCompact(r.pending)}
+          hint={money(r.pending)}
+          icon={Hourglass}
+          tone="warning"
+          delay={80}
+        />
+        <StatCard
+          label="Difference to target"
+          value={moneyCompact(r.difference)}
+          hint={`${r.records} records · ${money(r.rejected)} rejected`}
+          icon={Scale}
+          tone={Math.abs(r.difference) < 1 ? "success" : "info"}
+          delay={120}
+        />
       </div>
       <Progress value={pct} className="mt-4 h-2 bg-muted" />
 
@@ -95,11 +157,20 @@ function HistoricalPage() {
           </ul>
         </Panel>
       )}
-      <p className="mt-4 text-xs text-muted-foreground">CSV columns: username, amount, source reference, original date (YYYY-MM-DD). A header row is optional.</p>
+      <p className="mt-4 text-xs text-muted-foreground">
+        CSV columns: username, amount, source reference, original date (YYYY-MM-DD). A header row is
+        optional.
+      </p>
 
-      <Tabs value={tab} onValueChange={(v) => setTab(v as HistoricalStatus | "all")} className="mb-4 mt-6">
+      <Tabs
+        value={tab}
+        onValueChange={(v) => setTab(v as HistoricalStatus | "all")}
+        className="mb-4 mt-6"
+      >
         <TabsList className="h-auto flex-wrap">
-          <TabsTrigger value="pending_verification">To verify ({records.filter((h) => h.status === "pending_verification").length})</TabsTrigger>
+          <TabsTrigger value="pending_verification">
+            To verify ({records.filter((h) => h.status === "pending_verification").length})
+          </TabsTrigger>
           <TabsTrigger value="approved">Verified</TabsTrigger>
           <TabsTrigger value="rejected">Rejected</TabsTrigger>
           <TabsTrigger value="all">All</TabsTrigger>
@@ -109,59 +180,59 @@ function HistoricalPage() {
         <EmptyState title="No records here" />
       ) : (
         <TableShell>
-          <Table>
+          <Table className="w-full table-fixed">
             <TableHeader>
               <TableRow>
-                <TableHead>Guest</TableHead>
-                <TableHead>Source reference</TableHead>
-                <TableHead>Original date</TableHead>
-                <TableHead>Entered by</TableHead>
-                <TableHead className="text-right">Amount</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="text-right">Verify</TableHead>
+                <TableHead className="w-1/4">Guest</TableHead>
+                <TableHead className="w-2/5">Source reference</TableHead>
+                <TableHead className="w-[18%] text-right">Amount</TableHead>
+                <TableHead className="w-[17%]">Status</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {rows.map((h) => (
-                <HistoricalRow key={h.id} h={h} />
+                <HistoricalRow key={h.id} h={h} onSelect={() => setSelectedRecord(h)} />
               ))}
             </TableBody>
           </Table>
         </TableShell>
       )}
+      <HistoricalRecordDetailDialog
+        record={selectedRecord}
+        onClose={() => setSelectedRecord(null)}
+      />
       {adding && <AddHistoricalDialog onClose={() => setAdding(false)} />}
     </>
   );
 }
 
-function HistoricalRow({ h }: { h: HistoricalDebt }) {
-  const approve = useAction(() => historicalService.approve(h.id), { success: `Opening balance verified for ${h.guestName}.` });
-  const reject = useAction(() => historicalService.reject(h.id), { success: "Record rejected." });
+function HistoricalRow({ h, onSelect }: { h: HistoricalDebt; onSelect: () => void }) {
   return (
-    <TableRow>
+    <TableRow
+      className="cursor-pointer transition-colors hover:bg-muted/60 focus-visible:bg-muted/60"
+      tabIndex={0}
+      aria-label={`View historical debt record for ${h.guestName}`}
+      onClick={(event) => {
+        if (event.target instanceof Element && event.target.closest("button")) return;
+        onSelect();
+      }}
+      onKeyDown={(event) => {
+        if (event.target instanceof Element && event.target.closest("button")) return;
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          onSelect();
+        }
+      }}
+    >
       <TableCell className="whitespace-nowrap font-medium">{h.guestName}</TableCell>
       <TableCell className="text-sm">
         {h.sourceReference}
         {h.evidenceNote && <div className="text-xs text-muted-foreground">{h.evidenceNote}</div>}
       </TableCell>
-      <TableCell className="whitespace-nowrap text-sm">{date(h.originalDate)}</TableCell>
-      <TableCell className="whitespace-nowrap text-sm">{h.enteredBy}</TableCell>
       <TableCell className="text-right font-semibold tabular-nums">{money(h.amount)}</TableCell>
       <TableCell>
         <HistoricalStatusBadge status={h.status} />
         {h.verifiedBy && <div className="mt-1 text-xs text-muted-foreground">{h.verifiedBy}</div>}
-      </TableCell>
-      <TableCell className="text-right">
-        {h.status === "pending_verification" && (
-          <div className="flex justify-end gap-1">
-            <Button size="sm" variant="success" onClick={() => approve.mutate(undefined)} disabled={approve.isPending || reject.isPending} aria-label={`Verify ${h.guestName}`}>
-              <Check className="h-4 w-4" />
-            </Button>
-            <Button size="sm" variant="outline" onClick={() => reject.mutate(undefined)} disabled={approve.isPending || reject.isPending} aria-label={`Reject ${h.guestName}`}>
-              <X className="h-4 w-4" />
-            </Button>
-          </div>
-        )}
       </TableCell>
     </TableRow>
   );
@@ -185,17 +256,45 @@ function AddHistoricalDialog({ onClose }: { onClose: () => void }) {
     { success: "Record added for verification.", onSuccess: onClose },
   );
   return (
-    <FormDialog open onOpenChange={(o) => !o && onClose()} title="Add historical record" description="It counts towards the guest's debt only after verification." submitLabel="Add record" pending={save.isPending} onSubmit={() => save.mutate(undefined)}>
+    <FormDialog
+      open
+      onOpenChange={(o) => !o && onClose()}
+      title="Add historical record"
+      description="It counts towards the guest's debt only after verification."
+      submitLabel="Add record"
+      pending={save.isPending}
+      onSubmit={() => save.mutate(undefined)}
+    >
       <div className="space-y-2">
         <Label>Guest</Label>
         <GuestPicker value={guestId} onChange={(g) => setGuestId(g.id)} includeInactive />
       </div>
       <div className="grid gap-4 sm:grid-cols-2">
-        <TextField id="h-amount" label="Amount (ETB)" type="number" required value={amount} onChange={setAmount} />
+        <TextField
+          id="h-amount"
+          label="Amount (ETB)"
+          type="number"
+          required
+          value={amount}
+          onChange={setAmount}
+        />
         <TextField id="h-date" label="Original date" type="date" value={orig} onChange={setOrig} />
       </div>
-      <TextField id="h-ref" label="Source reference" required value={ref} onChange={setRef} placeholder="Ledger book, page, slip number" />
-      <TextField id="h-note" label="Evidence note" value={note} onChange={setNote} placeholder="Optional" />
+      <TextField
+        id="h-ref"
+        label="Source reference"
+        required
+        value={ref}
+        onChange={setRef}
+        placeholder="Ledger book, page, slip number"
+      />
+      <TextField
+        id="h-note"
+        label="Evidence note"
+        value={note}
+        onChange={setNote}
+        placeholder="Optional"
+      />
     </FormDialog>
   );
 }

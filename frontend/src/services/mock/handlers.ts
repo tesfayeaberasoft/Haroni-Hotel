@@ -84,7 +84,13 @@ function audit(ctx: Ctx | null, category: AuditLog["category"], action: string, 
 
 function notify(guestId: string, title: string, body: string) {
   const s = db();
-  (s.notifications[guestId] ??= []).unshift({ id: nextId("n"), at: now(), title, body, read: false });
+  (s.notifications[guestId] ??= []).unshift({
+    id: nextId("n"),
+    at: now(),
+    title,
+    body,
+    read: false,
+  });
 }
 
 function findGuest(id: string) {
@@ -103,8 +109,12 @@ export function guestAccount(g: DemoGuest, s: DemoState = db()): GuestAccount {
   const { password: _p, pin: _pin, ...pub } = g;
   return {
     ...pub,
-    historicalDebt: roundMoney(hist.filter((h) => h.status === "approved").reduce((a, h) => a + h.amount, 0)),
-    approvedCredit: roundMoney(txs.filter((t) => t.status === "approved").reduce((a, t) => a + t.total, 0)),
+    historicalDebt: roundMoney(
+      hist.filter((h) => h.status === "approved").reduce((a, h) => a + h.amount, 0),
+    ),
+    approvedCredit: roundMoney(
+      txs.filter((t) => t.status === "approved").reduce((a, t) => a + t.total, 0),
+    ),
     totalPayments: roundMoney(pays.filter((p) => p.verified).reduce((a, p) => a + p.amount, 0)),
     outstandingDebt: outstanding,
     pendingReservations: reservations,
@@ -122,7 +132,11 @@ function sweepDeadlines() {
     const deadline = Date.parse(tx.confirmationDeadline);
     if (deadline < t) {
       tx.status = "expired";
-      tx.history.push({ at: now(), by: "System", action: "Expired — confirmation deadline passed; reservation released" });
+      tx.history.push({
+        at: now(),
+        by: "System",
+        action: "Expired — confirmation deadline passed; reservation released",
+      });
       audit(null, "transaction", `Expired ${tx.code}`, tx.guestName);
       changed = true;
     } else if (
@@ -130,7 +144,11 @@ function sweepDeadlines() {
       !tx.history.some((h) => h.action.startsWith("Reminder"))
     ) {
       tx.history.push({ at: now(), by: "System", action: "Reminder sent to guest" });
-      notify(tx.guestId, "Confirmation reminder", `${tx.code} must be confirmed before ${new Date(deadline).toLocaleString()}.`);
+      notify(
+        tx.guestId,
+        "Confirmation reminder",
+        `${tx.code} must be confirmed before ${new Date(deadline).toLocaleString()}.`,
+      );
       changed = true;
     }
   }
@@ -141,14 +159,21 @@ function buildItems(raw: unknown): TransactionItem[] {
   const s = db();
   if (!Array.isArray(raw) || raw.length === 0) fail("Add at least one service.");
   return (raw as any[]).map((line) => {
-    const svc = s.services.find((x) => x.id === line.serviceId) ?? fail("Unknown service selected.");
+    const svc =
+      s.services.find((x) => x.id === line.serviceId) ?? fail("Unknown service selected.");
     if (!svc.available) fail(`${svc.name} is currently unavailable.`);
     const quantity = Number(line.quantity);
-    if (!Number.isFinite(quantity) || quantity <= 0) fail(`Enter a valid quantity for ${svc.name}.`);
-    const requested = line.requestedPrice != null && line.requestedPrice !== "" ? Number(line.requestedPrice) : null;
+    if (!Number.isFinite(quantity) || quantity <= 0)
+      fail(`Enter a valid quantity for ${svc.name}.`);
+    const requested =
+      line.requestedPrice != null && line.requestedPrice !== ""
+        ? Number(line.requestedPrice)
+        : null;
     const hasRequest = requested != null && requested !== svc.price;
-    if (hasRequest && (!Number.isFinite(requested!) || requested! <= 0)) fail(`Enter a valid requested price for ${svc.name}.`);
-    if (hasRequest && !String(line.priceReason ?? "").trim()) fail(`Give a reason for the special price on ${svc.name}.`);
+    if (hasRequest && (!Number.isFinite(requested!) || requested! <= 0))
+      fail(`Enter a valid requested price for ${svc.name}.`);
+    if (hasRequest && !String(line.priceReason ?? "").trim())
+      fail(`Give a reason for the special price on ${svc.name}.`);
     const unitPrice = hasRequest ? requested! : svc.price;
     return {
       serviceId: svc.id,
@@ -158,7 +183,15 @@ function buildItems(raw: unknown): TransactionItem[] {
       unitPrice,
       catalogPrice: svc.price,
       total: lineTotal(quantity, unitPrice),
-      ...(hasRequest ? { priceRequest: { requestedPrice: requested!, reason: String(line.priceReason).trim(), status: "pending" as const } } : {}),
+      ...(hasRequest
+        ? {
+            priceRequest: {
+              requestedPrice: requested!,
+              reason: String(line.priceReason).trim(),
+              status: "pending" as const,
+            },
+          }
+        : {}),
     };
   });
 }
@@ -167,7 +200,11 @@ function evaluateCredit(tx: CreditTransaction) {
   const s = db();
   const g = findGuest(tx.guestId);
   const txs = s.transactions.filter((t) => t.guestId === g.id);
-  const outstanding = outstandingDebt(txs, s.payments.filter((p) => p.guestId === g.id), s.historical.filter((h) => h.guestId === g.id));
+  const outstanding = outstandingDebt(
+    txs,
+    s.payments.filter((p) => p.guestId === g.id),
+    s.historical.filter((h) => h.guestId === g.id),
+  );
   const available = availableCredit(g.creditLimit, outstanding, sumReservations(txs, tx.id));
   tx.excessAmount = excessOverAvailable(tx.total, available);
   tx.exceedsLimit = tx.excessAmount > 0;
@@ -177,19 +214,29 @@ function sendToGuest(tx: CreditTransaction, by: string) {
   const s = db();
   evaluateCredit(tx);
   tx.status = "pending_guest";
-  tx.confirmationDeadline = new Date(Date.now() + s.settings.confirmationDeadlineHours * HOUR).toISOString();
+  tx.confirmationDeadline = new Date(
+    Date.now() + s.settings.confirmationDeadlineHours * HOUR,
+  ).toISOString();
   tx.history.push({
     at: now(),
     by,
     action: "Submitted to guest for confirmation",
-    note: tx.exceedsLimit ? `Exceeds available credit by ${tx.excessAmount.toLocaleString()} ETB — will need exceptional approval` : undefined,
+    note: tx.exceedsLimit
+      ? `Exceeds available credit by ${tx.excessAmount.toLocaleString()} ETB — will need exceptional approval`
+      : undefined,
   });
-  notify(tx.guestId, "New transaction to confirm", `${tx.code} · ${tx.total.toLocaleString()} ETB awaits your confirmation.`);
+  notify(
+    tx.guestId,
+    "New transaction to confirm",
+    `${tx.code} · ${tx.total.toLocaleString()} ETB awaits your confirmation.`,
+  );
 }
 
 function syncPriceRequests(tx: CreditTransaction, by: string) {
   const s = db();
-  s.priceRequests = s.priceRequests.filter((p) => !(p.transactionId === tx.id && p.status === "pending"));
+  s.priceRequests = s.priceRequests.filter(
+    (p) => !(p.transactionId === tx.id && p.status === "pending"),
+  );
   for (const item of tx.items) {
     if (item.priceRequest?.status === "pending") {
       s.priceRequests.unshift({
@@ -237,21 +284,48 @@ function requireReason(v: unknown, label = "reason") {
 // ---------------------------------------------------------------- auth
 route("POST", "/auth/login", null, ({ body }) => {
   const s = db();
-  const username = String(body.username ?? "").trim().toLowerCase();
+  const username = String(body.username ?? "")
+    .trim()
+    .toLowerCase();
   const password = String(body.password ?? "");
   if (!username || !password) fail("Enter your username and password.");
   const staff = s.staff.find((u) => u.username.toLowerCase() === username);
   const guest = s.guests.find((u) => u.username.toLowerCase() === username);
   const account = staff ?? guest;
   if (!account || account.password !== password) fail("Invalid username or password.", 401);
-  if (account!.status !== "active") fail("This account is not active. Contact the System Administrator.", 403);
+  if (account!.status !== "active")
+    fail("This account is not active. Contact the System Administrator.", 403);
   const token = `demo.${crypto.randomUUID()}`;
   s.sessions[token] = account!.id;
   const user = staff
-    ? { id: staff.id, role: staff.role, fullName: staff.fullName, username: staff.username, phone: staff.phone, status: staff.status }
-    : { id: guest!.id, role: "guest" as const, fullName: guest!.fullName, username: guest!.username, phone: guest!.phone, status: guest!.status, guestId: guest!.id };
+    ? {
+        id: staff.id,
+        role: staff.role,
+        fullName: staff.fullName,
+        username: staff.username,
+        phone: staff.phone,
+        status: staff.status,
+      }
+    : {
+        id: guest!.id,
+        role: "guest" as const,
+        fullName: guest!.fullName,
+        username: guest!.username,
+        phone: guest!.phone,
+        status: guest!.status,
+        guestId: guest!.id,
+      };
   if (staff) staff.lastLoginAt = now();
-  audit({ actor: { id: user.id, role: user.role, name: user.fullName }, body: {}, query: {}, params: {} }, "auth", "Signed in");
+  audit(
+    {
+      actor: { id: user.id, role: user.role, name: user.fullName },
+      body: {},
+      query: {},
+      params: {},
+    },
+    "auth",
+    "Signed in",
+  );
   return { token, user };
 });
 
@@ -265,13 +339,16 @@ route("POST", "/auth/forgot-password", null, ({ body }) => {
   const username = String(body.username ?? "").trim();
   if (!username) fail("Enter your username.");
   audit(null, "auth", "Password reset requested", username);
-  return { message: "Your request was sent to the System Administrator, who will reset your password." };
+  return {
+    message: "Your request was sent to the System Administrator, who will reset your password.",
+  };
 });
 
 route("POST", "/auth/change-password", [], (ctx) => {
   const s = db();
   const { currentPassword, newPassword } = ctx.body;
-  const acc = s.staff.find((u) => u.id === ctx.actor!.id) ?? s.guests.find((g) => g.id === ctx.actor!.id);
+  const acc =
+    s.staff.find((u) => u.id === ctx.actor!.id) ?? s.guests.find((g) => g.id === ctx.actor!.id);
   if (!acc) fail("Account not found", 404);
   if (acc!.password !== currentPassword) fail("Your current password is incorrect.");
   if (String(newPassword ?? "").length < 6) fail("New password must be at least 6 characters.");
@@ -308,7 +385,8 @@ route("GET", "/dashboard/admin", ["admin"], () => {
 
 route("GET", "/dashboard/cashier", ["cashier"], (ctx) => {
   const s = db();
-  const by = (st: CreditTransaction["status"][]) => s.transactions.filter((t) => st.includes(t.status)).length;
+  const by = (st: CreditTransaction["status"][]) =>
+    s.transactions.filter((t) => st.includes(t.status)).length;
   return {
     totalRecorded: s.transactions.length,
     recordedByMe: s.transactions.filter((t) => t.createdBy === ctx.actor!.name).length,
@@ -330,8 +408,16 @@ function monthlySeries(months: number, s = db()) {
     const key = d.toISOString().slice(0, 7);
     return {
       label: d.toLocaleDateString("en", { month: "short" }),
-      credit: roundMoney(s.transactions.filter((t) => t.status === "approved" && t.createdAt.slice(0, 7) === key).reduce((a, t) => a + t.total, 0)),
-      payments: roundMoney(s.payments.filter((p) => p.verified && p.paidAt.slice(0, 7) === key).reduce((a, p) => a + p.amount, 0)),
+      credit: roundMoney(
+        s.transactions
+          .filter((t) => t.status === "approved" && t.createdAt.slice(0, 7) === key)
+          .reduce((a, t) => a + t.total, 0),
+      ),
+      payments: roundMoney(
+        s.payments
+          .filter((p) => p.verified && p.paidAt.slice(0, 7) === key)
+          .reduce((a, p) => a + p.amount, 0),
+      ),
     };
   });
 }
@@ -341,17 +427,25 @@ route("GET", "/dashboard/finance", ["finance"], () => {
   const accounts = s.guests.map((g) => guestAccount(g));
   return {
     totalOutstanding: roundMoney(accounts.reduce((a, g) => a + g.outstandingDebt, 0)),
-    totalPayments: roundMoney(s.payments.filter((p) => p.verified).reduce((a, p) => a + p.amount, 0)),
-    totalApprovedCredit: roundMoney(s.transactions.filter((t) => t.status === "approved").reduce((a, t) => a + t.total, 0)),
+    totalPayments: roundMoney(
+      s.payments.filter((p) => p.verified).reduce((a, p) => a + p.amount, 0),
+    ),
+    totalApprovedCredit: roundMoney(
+      s.transactions.filter((t) => t.status === "approved").reduce((a, t) => a + t.total, 0),
+    ),
     approvedCount: s.transactions.filter((t) => t.status === "approved").length,
     pendingApprovals: s.transactions.filter((t) => t.status === "pending_finance").length,
     pendingExceptions: s.transactions.filter((t) => t.status === "pending_exception").length,
     pendingPriceRequests: s.priceRequests.filter((p) => p.status === "pending").length,
     pendingHistorical: s.historical.filter((h) => h.status === "pending_verification").length,
-    totalHistorical: roundMoney(s.historical.filter((h) => h.status === "approved").reduce((a, h) => a + h.amount, 0)),
+    totalHistorical: roundMoney(
+      s.historical.filter((h) => h.status === "approved").reduce((a, h) => a + h.amount, 0),
+    ),
     historicalTarget: s.settings.historicalDebtTarget,
     guestCount: s.guests.length,
-    exceeding: accounts.filter((a) => a.exceedsLimit).sort((a, b) => b.outstandingDebt - b.creditLimit - (a.outstandingDebt - a.creditLimit)),
+    exceeding: accounts
+      .filter((a) => a.exceedsLimit)
+      .sort((a, b) => b.outstandingDebt - b.creditLimit - (a.outstandingDebt - a.creditLimit)),
     series: monthlySeries(6),
     recentPayments: s.payments.slice(0, 5),
   };
@@ -363,8 +457,20 @@ route("GET", "/dashboard/guest", ["guest"], (ctx) => {
   const txs = s.transactions.filter((t) => t.guestId === g.id);
   const pays = s.payments.filter((p) => p.guestId === g.id);
   const activity = [
-    ...txs.flatMap((t) => t.history.map((h) => ({ at: h.at, title: `${t.code} · ${h.action}`, amount: t.total, kind: "transaction" as const }))),
-    ...pays.map((p) => ({ at: p.paidAt, title: `Payment received · ${p.receiptNumber}`, amount: p.amount, kind: "payment" as const })),
+    ...txs.flatMap((t) =>
+      t.history.map((h) => ({
+        at: h.at,
+        title: `${t.code} · ${h.action}`,
+        amount: t.total,
+        kind: "transaction" as const,
+      })),
+    ),
+    ...pays.map((p) => ({
+      at: p.paidAt,
+      title: `Payment received · ${p.receiptNumber}`,
+      amount: p.amount,
+      kind: "payment" as const,
+    })),
   ]
     .sort((a, b) => b.at.localeCompare(a.at))
     .slice(0, 8);
@@ -372,47 +478,72 @@ route("GET", "/dashboard/guest", ["guest"], (ctx) => {
     account: guestAccount(g),
     pending: txs.filter((t) => t.status === "pending_guest"),
     activity,
-    notifications: (s.notifications[g.id] ?? []).slice(0, 10),
+    notifications: (s.notifications[g.id] ?? []).slice(0, 100),
   };
 });
 
 // ---------------------------------------------------------------- staff users
-route("GET", "/users", ["admin"], () => db().staff.map(staffPublic));
-route("POST", "/users", ["admin"], (ctx) => {
+route("GET", "/users", ["admin", "finance"], () => db().staff.map(staffPublic));
+route("POST", "/users", ["admin", "finance"], (ctx) => {
   const s = db();
   const { fullName, username, phone, role, password } = ctx.body;
-  if (!String(fullName ?? "").trim() || !String(username ?? "").trim()) fail("Full name and username are required.");
+  if (!String(fullName ?? "").trim() || !String(username ?? "").trim())
+    fail("Full name and username are required.");
   if (!["admin", "cashier", "finance"].includes(role)) fail("Choose a valid role.");
+  if (ctx.actor!.role === "finance" && role === "admin") fail("Finance Managers cannot create Administrator accounts.");
   if (String(password ?? "").length < 6) fail("Password must be at least 6 characters.");
   const uname = String(username).trim().toLowerCase();
-  if ([...s.staff, ...s.guests].some((u) => u.username.toLowerCase() === uname)) fail("That username is already taken.");
-  const u = { id: nextId("u"), fullName: String(fullName).trim(), username: uname, phone: String(phone ?? ""), role, password, status: "active" as const, createdAt: now() };
+  if ([...s.staff, ...s.guests].some((u) => u.username.toLowerCase() === uname))
+    fail("That username is already taken.");
+  const u = {
+    id: nextId("u"),
+    fullName: String(fullName).trim(),
+    username: uname,
+    phone: String(phone ?? ""),
+    role,
+    password,
+    status: "active" as const,
+    createdAt: now(),
+  };
   s.staff.push(u);
   audit(ctx, "user", "Created user", `${u.fullName} (${role})`);
   return staffPublic(u);
 });
-route("PUT", "/users/:id", ["admin"], (ctx) => {
+route("PUT", "/users/:id", ["admin", "finance"], (ctx) => {
   const s = db();
   const u = s.staff.find((x) => x.id === ctx.params.id) ?? fail("User not found", 404);
   const { fullName, phone, role } = ctx.body;
   if (role && !["admin", "cashier", "finance"].includes(role)) fail("Choose a valid role.");
+  if (ctx.actor!.role === "finance" && (u!.role === "admin" || role === "admin")) {
+    fail("Finance Managers cannot manage Administrator accounts.");
+  }
   if (fullName) u!.fullName = String(fullName).trim();
   if (phone !== undefined) u!.phone = String(phone);
   if (role) u!.role = role;
   audit(ctx, "user", "Updated user", u!.fullName);
   return staffPublic(u!);
 });
-route("POST", "/users/:id/status", ["admin"], (ctx) => {
+route("POST", "/users/:id/status", ["admin", "finance"], (ctx) => {
   const u = db().staff.find((x) => x.id === ctx.params.id) ?? fail("User not found", 404);
+  if (ctx.actor!.role === "finance" && u!.role === "admin") {
+    fail("Finance Managers cannot manage Administrator accounts.");
+  }
   if (u!.id === ctx.actor!.id) fail("You cannot change your own account status.");
   u!.status = ctx.body.status;
   audit(ctx, "user", `Set user ${ctx.body.status}`, u!.fullName);
   return staffPublic(u!);
 });
-route("POST", "/users/:id/reset-password", ["admin"], (ctx) => {
+route("POST", "/users/:id/reset-password", ["admin", "finance"], (ctx) => {
   const s = db();
-  const u = s.staff.find((x) => x.id === ctx.params.id) ?? s.guests.find((x) => x.id === ctx.params.id) ?? fail("Account not found", 404);
-  if (String(ctx.body.newPassword ?? "").length < 6) fail("Password must be at least 6 characters.");
+  const u =
+    s.staff.find((x) => x.id === ctx.params.id) ??
+    s.guests.find((x) => x.id === ctx.params.id) ??
+    fail("Account not found", 404);
+  if (ctx.actor!.role === "finance" && "role" in u! && u!.role === "admin") {
+    fail("Finance Managers cannot manage Administrator accounts.");
+  }
+  if (String(ctx.body.newPassword ?? "").length < 6)
+    fail("Password must be at least 6 characters.");
   u!.password = ctx.body.newPassword;
   audit(ctx, "user", "Reset password", u!.fullName);
   return { ok: true };
@@ -421,10 +552,16 @@ route("POST", "/users/:id/reset-password", ["admin"], (ctx) => {
 // ---------------------------------------------------------------- guests
 route("GET", "/guests", ["admin", "cashier", "finance"], (ctx) => {
   const s = db();
-  const q = String(ctx.query.search ?? "").trim().toLowerCase();
+  const q = String(ctx.query.search ?? "")
+    .trim()
+    .toLowerCase();
   const status = ctx.query.status;
   let list = s.guests.filter(
-    (g) => !q || g.fullName.toLowerCase().includes(q) || g.phone.replace(/\s/g, "").includes(q.replace(/\s/g, "")) || g.username.includes(q),
+    (g) =>
+      !q ||
+      g.fullName.toLowerCase().includes(q) ||
+      g.phone.replace(/\s/g, "").includes(q.replace(/\s/g, "")) ||
+      g.username.includes(q),
   );
   if (status) list = list.filter((g) => g.status === status);
   if (ctx.actor!.role === "admin") return list.map(guestPublic);
@@ -434,7 +571,10 @@ route("GET", "/guests/:id", ["admin", "cashier", "finance"], (ctx) => {
   const s = db();
   const g = findGuest(ctx.params.id);
   if (ctx.actor!.role === "admin") return { account: guestPublic(g) };
-  const base = { account: guestAccount(g), transactions: s.transactions.filter((t) => t.guestId === g.id) };
+  const base = {
+    account: guestAccount(g),
+    transactions: s.transactions.filter((t) => t.guestId === g.id),
+  };
   if (ctx.actor!.role === "cashier") return base;
   return {
     ...base,
@@ -443,22 +583,35 @@ route("GET", "/guests/:id", ["admin", "cashier", "finance"], (ctx) => {
     limitChanges: s.limitChanges.filter((c) => c.guestId === g.id),
   };
 });
-route("POST", "/guests", ["admin"], (ctx) => {
+route("POST", "/guests", ["admin", "finance"], (ctx) => {
   const s = db();
   const { fullName, phone, username, password, pin } = ctx.body;
   if (!String(fullName ?? "").trim()) fail("Full name is required.");
   if (!String(phone ?? "").trim()) fail("Phone number is required.");
-  const uname = String(username ?? "").trim().toLowerCase();
+  const uname = String(username ?? "")
+    .trim()
+    .toLowerCase();
   if (!/^[a-z0-9._-]{3,}$/.test(uname)) fail("Username must be at least 3 letters/numbers.");
-  if ([...s.staff, ...s.guests].some((u) => u.username.toLowerCase() === uname)) fail("That username is already taken.");
+  if ([...s.staff, ...s.guests].some((u) => u.username.toLowerCase() === uname))
+    fail("That username is already taken.");
   if (String(password ?? "").length < 6) fail("Password must be at least 6 characters.");
   if (!/^\d{4,6}$/.test(String(pin ?? ""))) fail("PIN must be 4–6 digits.");
-  const g: DemoGuest = { id: nextId("g"), fullName: String(fullName).trim(), phone: String(phone).trim(), username: uname, password, pin: String(pin), status: "active", creditLimit: 0, createdAt: now() };
+  const g: DemoGuest = {
+    id: nextId("g"),
+    fullName: String(fullName).trim(),
+    phone: String(phone).trim(),
+    username: uname,
+    password,
+    pin: String(pin),
+    status: "active",
+    creditLimit: 0,
+    createdAt: now(),
+  };
   s.guests.push(g);
   audit(ctx, "guest", "Registered guest account", g.fullName);
   return guestPublic(g);
 });
-route("PUT", "/guests/:id", ["admin"], (ctx) => {
+route("PUT", "/guests/:id", ["admin", "finance"], (ctx) => {
   const g = findGuest(ctx.params.id);
   const { fullName, phone, pin } = ctx.body;
   if (fullName) g.fullName = String(fullName).trim();
@@ -470,7 +623,7 @@ route("PUT", "/guests/:id", ["admin"], (ctx) => {
   audit(ctx, "guest", "Updated guest information", g.fullName);
   return guestPublic(g);
 });
-route("POST", "/guests/:id/status", ["admin"], (ctx) => {
+route("POST", "/guests/:id/status", ["admin", "finance"], (ctx) => {
   const g = findGuest(ctx.params.id);
   g.status = ctx.body.status;
   audit(ctx, "guest", `Set guest ${ctx.body.status}`, g.fullName);
@@ -482,8 +635,22 @@ route("POST", "/guests/:id/credit-limit", ["finance"], (ctx) => {
   const limit = Number(ctx.body.creditLimit);
   if (!Number.isFinite(limit) || limit < 0) fail("Enter a valid credit limit.");
   const reason = requireReason(ctx.body.reason);
-  s.limitChanges.unshift({ id: nextId("cl"), guestId: g.id, guestName: g.fullName, previousLimit: g.creditLimit, newLimit: limit, reason, changedBy: ctx.actor!.name, changedAt: now() });
-  audit(ctx, "credit", "Updated credit limit", `${g.fullName}: ${g.creditLimit.toLocaleString()} → ${limit.toLocaleString()} ETB`);
+  s.limitChanges.unshift({
+    id: nextId("cl"),
+    guestId: g.id,
+    guestName: g.fullName,
+    previousLimit: g.creditLimit,
+    newLimit: limit,
+    reason,
+    changedBy: ctx.actor!.name,
+    changedAt: now(),
+  });
+  audit(
+    ctx,
+    "credit",
+    "Updated credit limit",
+    `${g.fullName}: ${g.creditLimit.toLocaleString()} → ${limit.toLocaleString()} ETB`,
+  );
   g.creditLimit = limit;
   return guestAccount(g);
 });
@@ -491,19 +658,26 @@ route("GET", "/credit-limits/history", ["finance"], () => db().limitChanges);
 
 // ---------------------------------------------------------------- services
 route("GET", "/services", [], () => db().services);
-route("POST", "/services", ["admin"], (ctx) => {
+route("POST", "/services", ["admin", "finance"], (ctx) => {
   const s = db();
   const { name, category, price, available } = ctx.body;
   if (!String(name ?? "").trim()) fail("Service name is required.");
   if (!["food", "drinks", "accommodation", "other"].includes(category)) fail("Choose a category.");
   const p = Number(price);
   if (!Number.isFinite(p) || p <= 0) fail("Enter a valid price.");
-  const svc: HotelService = { id: nextId("s"), name: String(name).trim(), category, price: p, available: available !== false, priceHistory: [{ price: p, effectiveFrom: now(), approvedBy: "Initial price" }] };
+  const svc: HotelService = {
+    id: nextId("s"),
+    name: String(name).trim(),
+    category,
+    price: p,
+    available: available !== false,
+    priceHistory: [{ price: p, effectiveFrom: now(), approvedBy: "Initial price" }],
+  };
   s.services.push(svc);
   audit(ctx, "catalog", "Added service", `${svc.name} · ${p.toLocaleString()} ETB`);
   return svc;
 });
-route("PUT", "/services/:id", ["admin"], (ctx) => {
+route("PUT", "/services/:id", ["admin", "finance"], (ctx) => {
   const s = db();
   const svc = s.services.find((x) => x.id === ctx.params.id) ?? fail("Service not found", 404);
   const { name, category, available, price, priceReason } = ctx.body;
@@ -515,9 +689,27 @@ route("PUT", "/services/:id", ["admin"], (ctx) => {
     if (!Number.isFinite(p) || p <= 0) fail("Enter a valid price.");
     const reason = requireReason(priceReason, "reason for the price change");
     svc!.proposedPrice = p;
-    s.priceRequests = s.priceRequests.filter((r) => !(r.kind === "catalog" && r.serviceId === svc!.id && r.status === "pending"));
-    s.priceRequests.unshift({ id: nextId("pr"), kind: "catalog", serviceId: svc!.id, serviceName: svc!.name, currentPrice: svc!.price, requestedPrice: p, reason, requestedBy: ctx.actor!.name, requestedAt: now(), status: "pending" });
-    audit(ctx, "catalog", "Proposed price change", `${svc!.name}: ${svc!.price.toLocaleString()} → ${p.toLocaleString()} ETB`);
+    s.priceRequests = s.priceRequests.filter(
+      (r) => !(r.kind === "catalog" && r.serviceId === svc!.id && r.status === "pending"),
+    );
+    s.priceRequests.unshift({
+      id: nextId("pr"),
+      kind: "catalog",
+      serviceId: svc!.id,
+      serviceName: svc!.name,
+      currentPrice: svc!.price,
+      requestedPrice: p,
+      reason,
+      requestedBy: ctx.actor!.name,
+      requestedAt: now(),
+      status: "pending",
+    });
+    audit(
+      ctx,
+      "catalog",
+      "Proposed price change",
+      `${svc!.name}: ${svc!.price.toLocaleString()} → ${p.toLocaleString()} ETB`,
+    );
   } else {
     audit(ctx, "catalog", "Updated service", svc!.name);
   }
@@ -538,7 +730,11 @@ function decidePrice(ctx: Ctx, approve: boolean) {
     if (svc) {
       if (approve) {
         svc.price = pr!.requestedPrice;
-        svc.priceHistory.unshift({ price: pr!.requestedPrice, effectiveFrom: now(), approvedBy: ctx.actor!.name });
+        svc.priceHistory.unshift({
+          price: pr!.requestedPrice,
+          effectiveFrom: now(),
+          approvedBy: ctx.actor!.name,
+        });
       }
       svc.proposedPrice = undefined;
     }
@@ -554,12 +750,24 @@ function decidePrice(ctx: Ctx, approve: boolean) {
       }
     }
     recompute(tx);
-    tx.history.push({ at: now(), by: ctx.actor!.name, action: `Special price ${approve ? "approved" : "rejected"} for ${pr!.serviceName}` });
-    if (tx.status === "pending_price_approval" && !tx.items.some((i) => i.priceRequest?.status === "pending")) {
+    tx.history.push({
+      at: now(),
+      by: ctx.actor!.name,
+      action: `Special price ${approve ? "approved" : "rejected"} for ${pr!.serviceName}`,
+    });
+    if (
+      tx.status === "pending_price_approval" &&
+      !tx.items.some((i) => i.priceRequest?.status === "pending")
+    ) {
       sendToGuest(tx, "System");
     }
   }
-  audit(ctx, "catalog", `${approve ? "Approved" : "Rejected"} price request`, `${pr!.serviceName}: ${pr!.requestedPrice.toLocaleString()} ETB`);
+  audit(
+    ctx,
+    "catalog",
+    `${approve ? "Approved" : "Rejected"} price request`,
+    `${pr!.serviceName}: ${pr!.requestedPrice.toLocaleString()} ETB`,
+  );
   return pr;
 }
 route("POST", "/price-requests/:id/approve", ["finance"], (ctx) => decidePrice(ctx, true));
@@ -576,7 +784,9 @@ route("GET", "/transactions", [], (ctx) => {
   if (guestId) list = list.filter((t) => t.guestId === guestId);
   if (search) {
     const q = String(search).toLowerCase();
-    list = list.filter((t) => t.code.toLowerCase().includes(q) || t.guestName.toLowerCase().includes(q));
+    list = list.filter(
+      (t) => t.code.toLowerCase().includes(q) || t.guestName.toLowerCase().includes(q),
+    );
   }
   return list;
 });
@@ -584,14 +794,19 @@ route("GET", "/transactions/:id", [], (ctx) => {
   const tx = findTx(ctx.params.id);
   if (ctx.actor!.role === "guest" && tx.guestId !== ctx.actor!.guestId) fail("Not found", 404);
   if (ctx.actor!.role === "admin") fail("Administrators cannot view financial transactions.", 403);
-  return { transaction: tx, account: ctx.actor!.role === "guest" ? undefined : guestAccount(findGuest(tx.guestId)) };
+  return {
+    transaction: tx,
+    account: ctx.actor!.role === "guest" ? undefined : guestAccount(findGuest(tx.guestId)),
+  };
 });
 route("POST", "/transactions", ["cashier"], (ctx) => {
   const s = db();
   const g = findGuest(String(ctx.body.guestId ?? ""));
   if (g.status !== "active") fail("This guest account is not active.");
   const items = buildItems(ctx.body.items);
-  const consumptionDate = ctx.body.consumptionDate ? new Date(ctx.body.consumptionDate).toISOString() : now();
+  const consumptionDate = ctx.body.consumptionDate
+    ? new Date(ctx.body.consumptionDate).toISOString()
+    : now();
   const n = s.counters.tx++;
   const tx: CreditTransaction = {
     id: `t-${n}`,
@@ -614,24 +829,55 @@ route("POST", "/transactions", ["cashier"], (ctx) => {
   if (items.some((i) => i.priceRequest)) {
     evaluateCredit(tx);
     tx.status = "pending_price_approval";
-    tx.history.push({ at: now(), by: ctx.actor!.name, action: "Sent to Finance for special price approval" });
+    tx.history.push({
+      at: now(),
+      by: ctx.actor!.name,
+      action: "Sent to Finance for special price approval",
+    });
     syncPriceRequests(tx, ctx.actor!.name);
   } else {
     sendToGuest(tx, ctx.actor!.name);
   }
-  audit(ctx, "transaction", `Recorded ${tx.code}`, `${g.fullName} · ${tx.total.toLocaleString()} ETB`);
+  audit(
+    ctx,
+    "transaction",
+    `Recorded ${tx.code}`,
+    `${g.fullName} · ${tx.total.toLocaleString()} ETB`,
+  );
+  return tx;
+});
+route("POST", "/transactions/:id/draft", ["cashier"], (ctx) => {
+  const tx = findTx(ctx.params.id);
+  if (tx.createdBy !== ctx.actor!.name)
+    fail("Only the creating Cashier can edit this transaction.", 403);
+  if (tx.status !== "draft") fail("Only draft transactions can be edited.");
+  tx.items = buildItems(ctx.body.items);
+  if (ctx.body.consumptionDate)
+    tx.consumptionDate = new Date(ctx.body.consumptionDate).toISOString();
+  recompute(tx);
+  tx.history.push({ at: now(), by: ctx.actor!.name, action: "Draft updated" });
+  audit(ctx, "transaction", `Updated draft ${tx.code}`);
   return tx;
 });
 route("PUT", "/transactions/:id", ["cashier"], (ctx) => {
   const tx = findTx(ctx.params.id);
-  if (!["disputed", "pending_guest", "pending_price_approval"].includes(tx.status)) fail("Only disputed or unconfirmed transactions can be corrected.");
+  if (tx.createdBy !== ctx.actor!.name)
+    fail("Only the creating Cashier can correct this transaction.", 403);
+  if (!["disputed", "pending_guest", "pending_price_approval"].includes(tx.status))
+    fail("Only disputed or unconfirmed transactions can be corrected.");
   const before = tx.total;
   tx.items = buildItems(ctx.body.items);
-  if (ctx.body.consumptionDate) tx.consumptionDate = new Date(ctx.body.consumptionDate).toISOString();
+  if (ctx.body.consumptionDate)
+    tx.consumptionDate = new Date(ctx.body.consumptionDate).toISOString();
   recompute(tx);
   tx.revision += 1;
   const note = String(ctx.body.note ?? "").trim() || undefined;
-  tx.history.push({ at: now(), by: ctx.actor!.name, action: `Corrected (revision ${tx.revision}): ${before.toLocaleString()} → ${tx.total.toLocaleString()} ETB`, note });
+  tx.history.push({
+    at: now(),
+    by: ctx.actor!.name,
+    action: `Corrected (revision ${tx.revision}): ${before.toLocaleString()} → ${tx.total.toLocaleString()} ETB`,
+    note,
+  });
   tx.disputeReason = undefined;
   if (tx.items.some((i) => i.priceRequest?.status === "pending")) {
     evaluateCredit(tx);
@@ -646,7 +892,8 @@ route("PUT", "/transactions/:id", ["cashier"], (ctx) => {
 route("POST", "/transactions/:id/confirm", ["guest"], (ctx) => {
   const tx = findTx(ctx.params.id);
   if (tx.guestId !== ctx.actor!.guestId) fail("Not found", 404);
-  if (tx.status !== "pending_guest") fail("This transaction is no longer awaiting your confirmation.");
+  if (tx.status !== "pending_guest")
+    fail("This transaction is no longer awaiting your confirmation.");
   tx.status = statusAfterGuestConfirm(tx.exceedsLimit);
   tx.confirmation = { method: "portal", at: now() };
   tx.history.push({ at: now(), by: ctx.actor!.name, action: "Confirmed by guest (portal)" });
@@ -659,7 +906,12 @@ route("POST", "/transactions/:id/send-otp", ["cashier"], (ctx) => {
   const g = findGuest(tx.guestId);
   const code = String(Math.floor(100000 + Math.random() * 900000));
   otpCodes.set(tx.id, code);
-  audit(ctx, "transaction", `Sent confirmation OTP for ${tx.code}`, g.phone.replace(/\d(?=\d{2})/g, "•"));
+  audit(
+    ctx,
+    "transaction",
+    `Sent confirmation OTP for ${tx.code}`,
+    g.phone.replace(/\d(?=\d{2})/g, "•"),
+  );
   return { sentTo: g.phone.replace(/\d(?=\d{2})/g, "•"), demoCode: code };
 });
 route("POST", "/transactions/:id/confirm-in-hotel", ["cashier"], (ctx) => {
@@ -669,18 +921,30 @@ route("POST", "/transactions/:id/confirm-in-hotel", ["cashier"], (ctx) => {
   const method = ctx.body.method === "otp" ? "otp" : "pin";
   const code = String(ctx.body.code ?? "");
   if (method === "pin" && code !== g.pin) fail("Incorrect PIN. Ask the guest to enter it again.");
-  if (method === "otp" && code !== otpCodes.get(tx.id)) fail("Incorrect or expired one-time password.");
+  if (method === "otp" && code !== otpCodes.get(tx.id))
+    fail("Incorrect or expired one-time password.");
   otpCodes.delete(tx.id);
   tx.status = statusAfterGuestConfirm(tx.exceedsLimit);
   tx.confirmation = { method, at: now(), assistedBy: ctx.actor!.name };
-  tx.history.push({ at: now(), by: g.fullName, action: `Confirmed by guest in hotel (${method.toUpperCase()})`, note: `Assisted by ${ctx.actor!.name}` });
-  audit(ctx, "transaction", `In-hotel confirmation for ${tx.code}`, `Method: ${method.toUpperCase()} · Guest: ${g.fullName}`);
+  tx.history.push({
+    at: now(),
+    by: g.fullName,
+    action: `Confirmed by guest in hotel (${method.toUpperCase()})`,
+    note: `Assisted by ${ctx.actor!.name}`,
+  });
+  audit(
+    ctx,
+    "transaction",
+    `In-hotel confirmation for ${tx.code}`,
+    `Method: ${method.toUpperCase()} · Guest: ${g.fullName}`,
+  );
   return tx;
 });
 route("POST", "/transactions/:id/dispute", ["guest"], (ctx) => {
   const tx = findTx(ctx.params.id);
   if (tx.guestId !== ctx.actor!.guestId) fail("Not found", 404);
-  if (tx.status !== "pending_guest") fail("This transaction is no longer awaiting your confirmation.");
+  if (tx.status !== "pending_guest")
+    fail("This transaction is no longer awaiting your confirmation.");
   const reason = requireReason(ctx.body.reason, "reason for the dispute");
   tx.status = "disputed";
   tx.disputeReason = reason;
@@ -690,7 +954,12 @@ route("POST", "/transactions/:id/dispute", ["guest"], (ctx) => {
 });
 route("POST", "/transactions/:id/cancel", ["cashier"], (ctx) => {
   const tx = findTx(ctx.params.id);
-  if (!["disputed", "pending_guest", "expired", "pending_price_approval"].includes(tx.status)) fail("This transaction can no longer be cancelled.");
+  if (tx.createdBy !== ctx.actor!.name)
+    fail("Only the creating Cashier can cancel this transaction.", 403);
+  if (
+    !["draft", "disputed", "pending_guest", "expired", "pending_price_approval"].includes(tx.status)
+  )
+    fail("This transaction can no longer be cancelled.");
   const reason = requireReason(ctx.body.reason);
   tx.status = "cancelled";
   tx.history.push({ at: now(), by: ctx.actor!.name, action: "Cancelled", note: reason });
@@ -702,20 +971,34 @@ route("POST", "/transactions/:id/cancel", ["cashier"], (ctx) => {
 });
 route("POST", "/transactions/:id/approve", ["finance"], (ctx) => {
   const tx = findTx(ctx.params.id);
-  if (!["pending_finance", "pending_exception"].includes(tx.status)) fail("This transaction is not awaiting finance approval.");
+  if (!["pending_finance", "pending_exception"].includes(tx.status))
+    fail("This transaction is not awaiting finance approval.");
   if (tx.status === "pending_exception") {
     const reason = requireReason(ctx.body.reason, "reason for the exceptional approval");
     tx.exceptionApproval = { approvedBy: ctx.actor!.name, reason, at: now() };
   }
   tx.status = "approved";
   tx.financeDecision = { by: ctx.actor!.name, at: now() };
-  tx.history.push({ at: now(), by: ctx.actor!.name, action: tx.exceptionApproval ? "Exceptional credit approved — added to debt" : "Approved — added to debt", note: tx.exceptionApproval?.reason });
-  audit(ctx, "transaction", `Approved ${tx.code}${tx.exceptionApproval ? " (exception)" : ""}`, `${tx.guestName} · ${tx.total.toLocaleString()} ETB`);
+  tx.history.push({
+    at: now(),
+    by: ctx.actor!.name,
+    action: tx.exceptionApproval
+      ? "Exceptional credit approved — added to debt"
+      : "Approved — added to debt",
+    note: tx.exceptionApproval?.reason,
+  });
+  audit(
+    ctx,
+    "transaction",
+    `Approved ${tx.code}${tx.exceptionApproval ? " (exception)" : ""}`,
+    `${tx.guestName} · ${tx.total.toLocaleString()} ETB`,
+  );
   return tx;
 });
 route("POST", "/transactions/:id/reject", ["finance"], (ctx) => {
   const tx = findTx(ctx.params.id);
-  if (!["pending_finance", "pending_exception"].includes(tx.status)) fail("This transaction is not awaiting finance approval.");
+  if (!["pending_finance", "pending_exception"].includes(tx.status))
+    fail("This transaction is not awaiting finance approval.");
   const reason = requireReason(ctx.body.reason, "rejection reason");
   tx.status = "rejected";
   tx.rejectionReason = reason;
@@ -743,7 +1026,8 @@ route("POST", "/payments", ["finance"], (ctx) => {
   const reference = String(ctx.body.reference ?? "").trim();
   if (method === "bank_transfer" && !reference) fail("Bank transfers need a reference number.");
   const acc = guestAccount(g);
-  if (amount > acc.outstandingDebt) fail(`Amount exceeds the outstanding debt of ${acc.outstandingDebt.toLocaleString()} ETB.`);
+  if (amount > acc.outstandingDebt)
+    fail(`Amount exceeds the outstanding debt of ${acc.outstandingDebt.toLocaleString()} ETB.`);
   const verified = ctx.body.verified !== false;
   const n = s.counters.receipt++;
   const p: Payment = {
@@ -763,8 +1047,18 @@ route("POST", "/payments", ["finance"], (ctx) => {
     note: String(ctx.body.note ?? "").trim() || undefined,
   };
   s.payments.unshift(p);
-  if (verified) notify(g.id, "Payment received", `${amount.toLocaleString()} ETB recorded. Receipt ${p.receiptNumber} is ready.`);
-  audit(ctx, "payment", `Recorded ${method === "cash" ? "cash" : "bank transfer"} payment${verified ? "" : " (awaiting verification)"}`, `${g.fullName} · ${amount.toLocaleString()} ETB`);
+  if (verified)
+    notify(
+      g.id,
+      "Payment received",
+      `${amount.toLocaleString()} ETB recorded. Receipt ${p.receiptNumber} is ready.`,
+    );
+  audit(
+    ctx,
+    "payment",
+    `Recorded ${method === "cash" ? "cash" : "bank transfer"} payment${verified ? "" : " (awaiting verification)"}`,
+    `${g.fullName} · ${amount.toLocaleString()} ETB`,
+  );
   return p;
 });
 route("POST", "/payments/:id/verify", ["finance"], (ctx) => {
@@ -776,7 +1070,11 @@ route("POST", "/payments/:id/verify", ["finance"], (ctx) => {
   p!.verified = true;
   p!.balanceBefore = acc.outstandingDebt;
   p!.balanceAfter = roundMoney(acc.outstandingDebt - p!.amount);
-  notify(p!.guestId, "Payment received", `${p!.amount.toLocaleString()} ETB verified. Receipt ${p!.receiptNumber} is ready.`);
+  notify(
+    p!.guestId,
+    "Payment received",
+    `${p!.amount.toLocaleString()} ETB verified. Receipt ${p!.receiptNumber} is ready.`,
+  );
   audit(ctx, "payment", "Verified payment", `${p!.receiptNumber}`);
   return p;
 });
@@ -789,7 +1087,8 @@ route("GET", "/payments/:id", ["finance", "guest"], (ctx) => {
 // ---------------------------------------------------------------- historical debts
 route("GET", "/historical-debts", ["finance"], () => db().historical);
 function reconciliation(s = db()) {
-  const sum = (st: string) => roundMoney(s.historical.filter((h) => h.status === st).reduce((a, h) => a + h.amount, 0));
+  const sum = (st: string) =>
+    roundMoney(s.historical.filter((h) => h.status === st).reduce((a, h) => a + h.amount, 0));
   const approved = sum("approved");
   const pending = sum("pending_verification");
   return {
@@ -810,9 +1109,25 @@ route("POST", "/historical-debts", ["finance"], (ctx) => {
   if (!Number.isFinite(amount) || amount <= 0) fail("Enter a valid amount.");
   const ref = String(ctx.body.sourceReference ?? "").trim();
   if (!ref) fail("Enter the source reference (ledger, page, slip number).");
-  const h = { id: nextId("h"), guestId: g.id, guestName: g.fullName, amount, sourceReference: ref, evidenceNote: String(ctx.body.evidenceNote ?? "").trim() || undefined, originalDate: ctx.body.originalDate ? new Date(ctx.body.originalDate).toISOString() : now(), status: "pending_verification" as const, enteredBy: ctx.actor!.name, enteredAt: now() };
+  const h = {
+    id: nextId("h"),
+    guestId: g.id,
+    guestName: g.fullName,
+    amount,
+    sourceReference: ref,
+    evidenceNote: String(ctx.body.evidenceNote ?? "").trim() || undefined,
+    originalDate: ctx.body.originalDate ? new Date(ctx.body.originalDate).toISOString() : now(),
+    status: "pending_verification" as const,
+    enteredBy: ctx.actor!.name,
+    enteredAt: now(),
+  };
   s.historical.unshift(h);
-  audit(ctx, "historical", "Entered historical debt", `${g.fullName} · ${amount.toLocaleString()} ETB`);
+  audit(
+    ctx,
+    "historical",
+    "Entered historical debt",
+    `${g.fullName} · ${amount.toLocaleString()} ETB`,
+  );
   return h;
 });
 route("POST", "/historical-debts/import", ["finance"], (ctx) => {
@@ -821,7 +1136,13 @@ route("POST", "/historical-debts/import", ["finance"], (ctx) => {
   const created: string[] = [];
   const errors: string[] = [];
   (rows as any[]).forEach((row, i) => {
-    const g = s.guests.find((x) => x.username === String(row.username ?? "").trim().toLowerCase());
+    const g = s.guests.find(
+      (x) =>
+        x.username ===
+        String(row.username ?? "")
+          .trim()
+          .toLowerCase(),
+    );
     const amount = Number(row.amount);
     if (!g) {
       errors.push(`Row ${i + 1}: unknown guest username "${row.username}"`);
@@ -831,10 +1152,25 @@ route("POST", "/historical-debts/import", ["finance"], (ctx) => {
       errors.push(`Row ${i + 1}: invalid amount`);
       return;
     }
-    s.historical.unshift({ id: nextId("h"), guestId: g.id, guestName: g.fullName, amount: roundMoney(amount), sourceReference: String(row.sourceReference || "Bulk import"), originalDate: row.originalDate ? new Date(row.originalDate).toISOString() : now(), status: "pending_verification", enteredBy: ctx.actor!.name, enteredAt: now() });
+    s.historical.unshift({
+      id: nextId("h"),
+      guestId: g.id,
+      guestName: g.fullName,
+      amount: roundMoney(amount),
+      sourceReference: String(row.sourceReference || "Bulk import"),
+      originalDate: row.originalDate ? new Date(row.originalDate).toISOString() : now(),
+      status: "pending_verification",
+      enteredBy: ctx.actor!.name,
+      enteredAt: now(),
+    });
     created.push(g.fullName);
   });
-  audit(ctx, "historical", "Imported historical debts", `${created.length} rows, ${errors.length} errors`);
+  audit(
+    ctx,
+    "historical",
+    "Imported historical debts",
+    `${created.length} rows, ${errors.length} errors`,
+  );
   return { created: created.length, errors };
 });
 function decideHistorical(ctx: Ctx, approve: boolean) {
@@ -843,7 +1179,12 @@ function decideHistorical(ctx: Ctx, approve: boolean) {
   h!.status = approve ? "approved" : "rejected";
   h!.verifiedBy = ctx.actor!.name;
   h!.verifiedAt = now();
-  audit(ctx, "historical", approve ? "Approved opening balance" : "Rejected historical record", `${h!.guestName} · ${h!.amount.toLocaleString()} ETB`);
+  audit(
+    ctx,
+    "historical",
+    approve ? "Approved opening balance" : "Rejected historical record",
+    `${h!.guestName} · ${h!.amount.toLocaleString()} ETB`,
+  );
   return h;
 }
 route("POST", "/historical-debts/:id/approve", ["finance"], (ctx) => decideHistorical(ctx, true));
@@ -860,7 +1201,8 @@ function periodRange(period: ReportPeriod) {
   return { from, to };
 }
 function seriesFor(period: ReportPeriod, s = db()) {
-  if (period === "monthly" || period === "yearly") return monthlySeries(period === "yearly" ? 12 : 6, s);
+  if (period === "monthly" || period === "yearly")
+    return monthlySeries(period === "yearly" ? 12 : 6, s);
   const buckets = period === "daily" ? 14 : 8;
   const size = period === "daily" ? DAY : 7 * DAY;
   return [...Array(buckets)].map((_, i) => {
@@ -869,8 +1211,14 @@ function seriesFor(period: ReportPeriod, s = db()) {
     const inRange = (d: string) => Date.parse(d) > start && Date.parse(d) <= end;
     return {
       label: new Date(end).toLocaleDateString("en", { month: "short", day: "numeric" }),
-      credit: roundMoney(s.transactions.filter((t) => t.status === "approved" && inRange(t.createdAt)).reduce((a, t) => a + t.total, 0)),
-      payments: roundMoney(s.payments.filter((p) => p.verified && inRange(p.paidAt)).reduce((a, p) => a + p.amount, 0)),
+      credit: roundMoney(
+        s.transactions
+          .filter((t) => t.status === "approved" && inRange(t.createdAt))
+          .reduce((a, t) => a + t.total, 0),
+      ),
+      payments: roundMoney(
+        s.payments.filter((p) => p.verified && inRange(p.paidAt)).reduce((a, p) => a + p.amount, 0),
+      ),
     };
   });
 }
@@ -889,65 +1237,211 @@ route("GET", "/reports", ["finance"], (ctx): ReportResult => {
   const { from, to } = periodRange(period);
   const inRange = (d: string) => Date.parse(d) >= from.getTime() && Date.parse(d) <= to.getTime();
   const series = seriesFor(period, s);
-  const base = { title: `${TITLES[type]} · ${period.charAt(0).toUpperCase()}${period.slice(1)}`, period, from: from.toISOString(), to: to.toISOString(), series };
+  const base = {
+    title: `${TITLES[type]} · ${period.charAt(0).toUpperCase()}${period.slice(1)}`,
+    period,
+    from: from.toISOString(),
+    to: to.toISOString(),
+    series,
+  };
   const accounts = s.guests.map((g) => guestAccount(g, s));
   switch (type) {
     case "guest_debt":
-      return { ...base, columns: [
-        { key: "guest", label: "Guest" }, { key: "phone", label: "Phone" }, { key: "limit", label: "Credit limit", money: true },
-        { key: "historical", label: "Historical", money: true }, { key: "credit", label: "Approved credit", money: true },
-        { key: "payments", label: "Payments", money: true }, { key: "outstanding", label: "Outstanding", money: true },
-      ], rows: accounts.map((a) => ({ guest: a.fullName, phone: a.phone, limit: a.creditLimit, historical: a.historicalDebt, credit: a.approvedCredit, payments: a.totalPayments, outstanding: a.outstandingDebt })),
-      totals: [{ label: "Total outstanding", value: roundMoney(accounts.reduce((x, a) => x + a.outstandingDebt, 0)) }] };
+      return {
+        ...base,
+        columns: [
+          { key: "guest", label: "Guest" },
+          { key: "phone", label: "Phone" },
+          { key: "limit", label: "Credit limit", money: true },
+          { key: "historical", label: "Historical", money: true },
+          { key: "credit", label: "Approved credit", money: true },
+          { key: "payments", label: "Payments", money: true },
+          { key: "outstanding", label: "Outstanding", money: true },
+        ],
+        rows: accounts.map((a) => ({
+          guest: a.fullName,
+          phone: a.phone,
+          limit: a.creditLimit,
+          historical: a.historicalDebt,
+          credit: a.approvedCredit,
+          payments: a.totalPayments,
+          outstanding: a.outstandingDebt,
+        })),
+        totals: [
+          {
+            label: "Total outstanding",
+            value: roundMoney(accounts.reduce((x, a) => x + a.outstandingDebt, 0)),
+          },
+        ],
+      };
     case "payments": {
       const list = s.payments.filter((p) => inRange(p.paidAt));
-      return { ...base, columns: [
-        { key: "date", label: "Date" }, { key: "receipt", label: "Receipt" }, { key: "guest", label: "Guest" },
-        { key: "method", label: "Method" }, { key: "reference", label: "Reference" }, { key: "amount", label: "Amount", money: true }, { key: "by", label: "Recorded by" },
-      ], rows: list.map((p) => ({ date: p.paidAt.slice(0, 10), receipt: p.receiptNumber, guest: p.guestName, method: p.method === "cash" ? "Cash" : "Bank transfer", reference: p.reference ?? "—", amount: p.amount, by: p.recordedBy })),
-      totals: [
-        { label: "Total received", value: roundMoney(list.filter((p) => p.verified).reduce((a, p) => a + p.amount, 0)) },
-        { label: "Cash", value: roundMoney(list.filter((p) => p.method === "cash").reduce((a, p) => a + p.amount, 0)) },
-        { label: "Bank transfer", value: roundMoney(list.filter((p) => p.method === "bank_transfer").reduce((a, p) => a + p.amount, 0)) },
-      ] };
+      return {
+        ...base,
+        columns: [
+          { key: "date", label: "Date" },
+          { key: "receipt", label: "Receipt" },
+          { key: "guest", label: "Guest" },
+          { key: "method", label: "Method" },
+          { key: "reference", label: "Reference" },
+          { key: "amount", label: "Amount", money: true },
+          { key: "by", label: "Recorded by" },
+        ],
+        rows: list.map((p) => ({
+          date: p.paidAt.slice(0, 10),
+          receipt: p.receiptNumber,
+          guest: p.guestName,
+          method: p.method === "cash" ? "Cash" : "Bank transfer",
+          reference: p.reference ?? "—",
+          amount: p.amount,
+          by: p.recordedBy,
+        })),
+        totals: [
+          {
+            label: "Total received",
+            value: roundMoney(list.filter((p) => p.verified).reduce((a, p) => a + p.amount, 0)),
+          },
+          {
+            label: "Cash",
+            value: roundMoney(
+              list.filter((p) => p.method === "cash").reduce((a, p) => a + p.amount, 0),
+            ),
+          },
+          {
+            label: "Bank transfer",
+            value: roundMoney(
+              list.filter((p) => p.method === "bank_transfer").reduce((a, p) => a + p.amount, 0),
+            ),
+          },
+        ],
+      };
     }
     case "outstanding": {
-      const list = accounts.filter((a) => a.outstandingDebt > 0).sort((a, b) => b.outstandingDebt - a.outstandingDebt);
-      return { ...base, columns: [
-        { key: "guest", label: "Guest" }, { key: "limit", label: "Credit limit", money: true }, { key: "outstanding", label: "Outstanding", money: true },
-        { key: "available", label: "Available", money: true }, { key: "status", label: "Limit status" },
-      ], rows: list.map((a) => ({ guest: a.fullName, limit: a.creditLimit, outstanding: a.outstandingDebt, available: a.availableCredit, status: a.exceedsLimit ? "Exceeded" : "Within limit" })),
-      totals: [{ label: "Total outstanding", value: roundMoney(list.reduce((x, a) => x + a.outstandingDebt, 0)) }, { label: "Guests over limit", value: list.filter((a) => a.exceedsLimit).length }] };
+      const list = accounts
+        .filter((a) => a.outstandingDebt > 0)
+        .sort((a, b) => b.outstandingDebt - a.outstandingDebt);
+      return {
+        ...base,
+        columns: [
+          { key: "guest", label: "Guest" },
+          { key: "limit", label: "Credit limit", money: true },
+          { key: "outstanding", label: "Outstanding", money: true },
+          { key: "available", label: "Available", money: true },
+          { key: "status", label: "Limit status" },
+        ],
+        rows: list.map((a) => ({
+          guest: a.fullName,
+          limit: a.creditLimit,
+          outstanding: a.outstandingDebt,
+          available: a.availableCredit,
+          status: a.exceedsLimit ? "Exceeded" : "Within limit",
+        })),
+        totals: [
+          {
+            label: "Total outstanding",
+            value: roundMoney(list.reduce((x, a) => x + a.outstandingDebt, 0)),
+          },
+          { label: "Guests over limit", value: list.filter((a) => a.exceedsLimit).length },
+        ],
+      };
     }
     case "credit_transactions": {
       const list = s.transactions.filter((t) => inRange(t.createdAt));
-      return { ...base, columns: [
-        { key: "date", label: "Date" }, { key: "code", label: "Transaction" }, { key: "guest", label: "Guest" },
-        { key: "services", label: "Services" }, { key: "status", label: "Status" }, { key: "amount", label: "Amount", money: true },
-      ], rows: list.map((t) => ({ date: t.createdAt.slice(0, 10), code: t.code, guest: t.guestName, services: t.items.map((i) => `${i.serviceName} ×${i.quantity}`).join(", "), status: t.status.replace(/_/g, " "), amount: t.total })),
-      totals: [
-        { label: "Approved", value: roundMoney(list.filter((t) => t.status === "approved").reduce((a, t) => a + t.total, 0)) },
-        { label: "Pending", value: roundMoney(list.filter((t) => RESERVING_STATUSES.includes(t.status)).reduce((a, t) => a + t.total, 0)) },
-        { label: "Rejected", value: roundMoney(list.filter((t) => t.status === "rejected").reduce((a, t) => a + t.total, 0)) },
-      ] };
+      return {
+        ...base,
+        columns: [
+          { key: "date", label: "Date" },
+          { key: "code", label: "Transaction" },
+          { key: "guest", label: "Guest" },
+          { key: "services", label: "Services" },
+          { key: "status", label: "Status" },
+          { key: "amount", label: "Amount", money: true },
+        ],
+        rows: list.map((t) => ({
+          date: t.createdAt.slice(0, 10),
+          code: t.code,
+          guest: t.guestName,
+          services: t.items.map((i) => `${i.serviceName} ×${i.quantity}`).join(", "),
+          status: t.status.replace(/_/g, " "),
+          amount: t.total,
+        })),
+        totals: [
+          {
+            label: "Approved",
+            value: roundMoney(
+              list.filter((t) => t.status === "approved").reduce((a, t) => a + t.total, 0),
+            ),
+          },
+          {
+            label: "Pending",
+            value: roundMoney(
+              list
+                .filter((t) => RESERVING_STATUSES.includes(t.status))
+                .reduce((a, t) => a + t.total, 0),
+            ),
+          },
+          {
+            label: "Rejected",
+            value: roundMoney(
+              list.filter((t) => t.status === "rejected").reduce((a, t) => a + t.total, 0),
+            ),
+          },
+        ],
+      };
     }
     case "historical": {
       const rec = reconciliation(s);
-      return { ...base, columns: [
-        { key: "guest", label: "Guest" }, { key: "reference", label: "Source reference" }, { key: "date", label: "Original date" },
-        { key: "status", label: "Status" }, { key: "amount", label: "Amount", money: true },
-      ], rows: s.historical.map((h) => ({ guest: h.guestName, reference: h.sourceReference, date: h.originalDate.slice(0, 10), status: h.status.replace(/_/g, " "), amount: h.amount })),
-      totals: [{ label: "Approved opening balances", value: rec.approved }, { label: "Pending verification", value: rec.pending }, { label: "Unreconciled vs target", value: rec.difference }] };
+      return {
+        ...base,
+        columns: [
+          { key: "guest", label: "Guest" },
+          { key: "reference", label: "Source reference" },
+          { key: "date", label: "Original date" },
+          { key: "status", label: "Status" },
+          { key: "amount", label: "Amount", money: true },
+        ],
+        rows: s.historical.map((h) => ({
+          guest: h.guestName,
+          reference: h.sourceReference,
+          date: h.originalDate.slice(0, 10),
+          status: h.status.replace(/_/g, " "),
+          amount: h.amount,
+        })),
+        totals: [
+          { label: "Approved opening balances", value: rec.approved },
+          { label: "Pending verification", value: rec.pending },
+          { label: "Unreconciled vs target", value: rec.difference },
+        ],
+      };
     }
     default: {
-      const rows = series.map((b) => ({ period: b.label, credit: b.credit, payments: b.payments, net: roundMoney(b.credit - b.payments) }));
-      return { ...base, columns: [
-        { key: "period", label: "Period" }, { key: "credit", label: "Approved credit", money: true }, { key: "payments", label: "Payments", money: true }, { key: "net", label: "Net change", money: true },
-      ], rows, totals: [
-        { label: "Approved credit", value: roundMoney(rows.reduce((a, r) => a + r.credit, 0)) },
-        { label: "Payments received", value: roundMoney(rows.reduce((a, r) => a + r.payments, 0)) },
-        { label: "Total outstanding", value: roundMoney(accounts.reduce((x, a) => x + a.outstandingDebt, 0)) },
-      ] };
+      const rows = series.map((b) => ({
+        period: b.label,
+        credit: b.credit,
+        payments: b.payments,
+        net: roundMoney(b.credit - b.payments),
+      }));
+      return {
+        ...base,
+        columns: [
+          { key: "period", label: "Period" },
+          { key: "credit", label: "Approved credit", money: true },
+          { key: "payments", label: "Payments", money: true },
+          { key: "net", label: "Net change", money: true },
+        ],
+        rows,
+        totals: [
+          { label: "Approved credit", value: roundMoney(rows.reduce((a, r) => a + r.credit, 0)) },
+          {
+            label: "Payments received",
+            value: roundMoney(rows.reduce((a, r) => a + r.payments, 0)),
+          },
+          {
+            label: "Total outstanding",
+            value: roundMoney(accounts.reduce((x, a) => x + a.outstandingDebt, 0)),
+          },
+        ],
+      };
     }
   }
 });
@@ -964,48 +1458,96 @@ route("GET", "/me/statement", ["guest"], (ctx) => {
     payments: s.payments.filter((p) => p.guestId === g.id && p.verified),
   };
 });
-route("GET", "/me/notifications", ["guest"], (ctx) => db().notifications[ctx.actor!.guestId!] ?? []);
+route(
+  "GET",
+  "/me/notifications",
+  ["guest"],
+  (ctx) => db().notifications[ctx.actor!.guestId!] ?? [],
+);
 route("POST", "/me/notifications/read", ["guest"], (ctx) => {
   (db().notifications[ctx.actor!.guestId!] ?? []).forEach((n) => (n.read = true));
+  return { ok: true };
+});
+route("DELETE", "/me/notifications/:id", ["guest"], (ctx) => {
+  const guestId = ctx.actor!.guestId!;
+  const notifications = db().notifications[guestId] ?? [];
+  if (!notifications.some((notification) => notification.id === ctx.params.id))
+    fail("Notification not found", 404);
+  db().notifications[guestId] = notifications.filter(
+    (notification) => notification.id !== ctx.params.id,
+  );
+  return { ok: true };
+});
+route("DELETE", "/me/notifications", ["guest"], (ctx) => {
+  db().notifications[ctx.actor!.guestId!] = [];
+  return { ok: true };
+});
+route("POST", "/me/notifications/:id/delete", ["guest"], (ctx) => {
+  const guestId = ctx.actor!.guestId!;
+  const notifications = db().notifications[guestId] ?? [];
+  if (!notifications.some((notification) => notification.id === ctx.params.id))
+    fail("Notification not found", 404);
+  db().notifications[guestId] = notifications.filter(
+    (notification) => notification.id !== ctx.params.id,
+  );
+  return { ok: true };
+});
+route("POST", "/me/notifications/clear", ["guest"], (ctx) => {
+  db().notifications[ctx.actor!.guestId!] = [];
   return { ok: true };
 });
 
 // ---------------------------------------------------------------- admin system
 route("GET", "/settings", [], () => db().settings);
-route("PUT", "/settings", ["admin"], (ctx) => {
+route("PUT", "/settings", ["admin", "finance"], (ctx) => {
   const s = db();
   const next = { ...s.settings, ...ctx.body };
   next.confirmationDeadlineHours = Number(next.confirmationDeadlineHours);
   next.reminderBeforeHours = Number(next.reminderBeforeHours);
   next.historicalDebtTarget = Number(next.historicalDebtTarget);
-  if (!(next.confirmationDeadlineHours >= 1)) fail("Confirmation deadline must be at least 1 hour.");
-  if (next.reminderBeforeHours >= next.confirmationDeadlineHours) fail("Reminder must be sent before the deadline.");
+  if (!(next.confirmationDeadlineHours >= 1))
+    fail("Confirmation deadline must be at least 1 hour.");
+  if (next.reminderBeforeHours >= next.confirmationDeadlineHours)
+    fail("Reminder must be sent before the deadline.");
   s.settings = next;
   audit(ctx, "settings", "Updated system settings");
   return s.settings;
 });
-route("GET", "/audit-logs", ["admin"], (ctx) => {
+route("GET", "/audit-logs", ["admin", "finance"], (ctx) => {
   let list = db().audit;
   if (ctx.query.category) list = list.filter((a) => a.category === ctx.query.category);
   if (ctx.query.search) {
     const q = String(ctx.query.search).toLowerCase();
-    list = list.filter((a) => `${a.actor} ${a.action} ${a.details ?? ""}`.toLowerCase().includes(q));
+    list = list.filter((a) =>
+      `${a.actor} ${a.action} ${a.details ?? ""}`.toLowerCase().includes(q),
+    );
   }
   return list.slice(0, 300);
 });
-route("GET", "/backups", ["admin"], () => db().backups);
-route("POST", "/backups", ["admin"], (ctx) => {
+route("GET", "/backups", ["admin", "finance"], () => db().backups);
+route("POST", "/backups", ["admin", "finance"], (ctx) => {
   const s = db();
   const { sessions: _s, ...snapshot } = s;
   const json = JSON.stringify(snapshot);
-  const b = { id: nextId("b"), createdAt: now(), createdBy: ctx.actor!.name, sizeKb: Math.round(json.length / 1024) };
+  const b = {
+    id: nextId("b"),
+    createdAt: now(),
+    createdBy: ctx.actor!.name,
+    sizeKb: Math.round(json.length / 1024),
+  };
   s.backups.unshift(b);
   audit(ctx, "backup", "Created database backup", `${b.sizeKb} KB`);
   return { backup: b, snapshot };
 });
-route("POST", "/backups/restore", ["admin"], (ctx) => {
+route("POST", "/backups/restore", ["admin", "finance"], (ctx) => {
   const snap = ctx.body.snapshot as DemoState | undefined;
-  if (!snap || snap.version !== DEMO_VERSION || !Array.isArray(snap.transactions) || !Array.isArray(snap.guests)) fail("This file is not a valid DCMS backup.");
+  if (
+    !snap ||
+    snap.version !== DEMO_VERSION ||
+    !Array.isArray(snap.transactions) ||
+    !Array.isArray(snap.guests)
+  )
+    fail("This file is not a valid DCMS backup.");
   const sessions = db().sessions;
   replaceState({ ...snap!, sessions });
   audit(ctx, "backup", "Restored database from backup");
@@ -1015,7 +1557,12 @@ route("POST", "/backups/restore", ["admin"], (ctx) => {
 // ---------------------------------------------------------------- dispatcher
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-export async function demoRequest<T>(method: HttpMethod, path: string, body?: unknown, query?: Query): Promise<T> {
+export async function demoRequest<T>(
+  method: HttpMethod,
+  path: string,
+  body?: unknown,
+  query?: Query,
+): Promise<T> {
   if (import.meta.env.MODE !== "test") await sleep(180 + Math.random() * 260);
   const s = db();
   const [cleanPath = "", qs = ""] = path.split("?");
@@ -1023,7 +1570,9 @@ export async function demoRequest<T>(method: HttpMethod, path: string, body?: un
   const def = routes.find((r) => r.method === method && r.re.test(cleanPath));
   if (!def) throw new ApiError(`No demo endpoint for ${method} ${cleanPath}`, 404);
   const m = cleanPath.match(def.re)!;
-  const params = Object.fromEntries(def.keys.map((k, i) => [k, decodeURIComponent(m[i + 1] ?? "")]));
+  const params = Object.fromEntries(
+    def.keys.map((k, i) => [k, decodeURIComponent(m[i + 1] ?? "")]),
+  );
 
   const token = readSession()?.token;
   let actor: Actor | null = null;
@@ -1031,8 +1580,10 @@ export async function demoRequest<T>(method: HttpMethod, path: string, body?: un
   if (userId) {
     const staff = s.staff.find((u) => u.id === userId);
     const guest = s.guests.find((u) => u.id === userId);
-    if (staff && staff.status === "active") actor = { id: staff.id, role: staff.role, name: staff.fullName };
-    if (guest && guest.status === "active") actor = { id: guest.id, role: "guest", name: guest.fullName, guestId: guest.id };
+    if (staff && staff.status === "active")
+      actor = { id: staff.id, role: staff.role, name: staff.fullName };
+    if (guest && guest.status === "active")
+      actor = { id: guest.id, role: "guest", name: guest.fullName, guestId: guest.id };
   }
   if (def.roles) {
     if (!actor) {
@@ -1041,10 +1592,17 @@ export async function demoRequest<T>(method: HttpMethod, path: string, body?: un
       window.dispatchEvent(new Event(UNAUTHORIZED_EVENT));
       throw new ApiError("Your session has ended. Please sign in again.", 401);
     }
-    if (def.roles.length && !def.roles.includes(actor.role)) throw new ApiError("You do not have permission to do this.", 403);
+    if (def.roles.length && !def.roles.includes(actor.role))
+      throw new ApiError("You do not have permission to do this.", 403);
   }
   sweepDeadlines();
-  const result = def.handler({ actor, body: (body ?? {}) as Record<string, any>, query: q, params, token });
+  const result = def.handler({
+    actor,
+    body: (body ?? {}) as Record<string, any>,
+    query: q,
+    params,
+    token,
+  });
   if (method !== "GET") persist();
   // Return a deep copy so UI mutations never touch the store.
   return JSON.parse(JSON.stringify(result ?? null)) as T;

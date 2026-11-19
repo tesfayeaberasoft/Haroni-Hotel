@@ -21,6 +21,8 @@ import {
   phpText,
   type PhpRow,
 } from "./php-mappers";
+import { readSession } from "./session";
+import { cashierSafeGuestAccount } from "@/lib/cashier";
 
 export interface GuestInput {
   fullName: string;
@@ -38,11 +40,18 @@ export interface GuestDetail {
   limitChanges?: CreditLimitChange[] | undefined;
 }
 
+function cashierSafe(account: GuestAccount) {
+  return readSession()?.user.role === "cashier" ? cashierSafeGuestAccount(account) : account;
+}
+
 export const guestsService = {
   search: async (search?: string, status?: AccountStatus) => {
-    if (USE_DEMO_BACKEND) return api.get<GuestAccount[]>("/guests", { search, status });
+    if (USE_DEMO_BACKEND) {
+      const accounts = await api.get<GuestAccount[]>("/guests", { search, status });
+      return accounts.map(cashierSafe);
+    }
     const response = await api.get<{ guests: unknown[] }>("/guests", { q: search });
-    return phpRows(response.guests).map(mapPhpAccount).filter((guest) => !status || guest.status === status);
+    return phpRows(response.guests).map(mapPhpAccount).filter((guest) => !status || guest.status === status).map(cashierSafe);
   },
   listBasic: async () => {
     if (USE_DEMO_BACKEND) return api.get<Guest[]>("/guests");

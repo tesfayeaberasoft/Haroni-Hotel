@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import type { AuthSession, CreditTransaction, GuestAccount, Payment } from "@/types";
 import { writeSession } from "../session";
-import { setMemoryState } from "./db";
+import { db, setMemoryState } from "./db";
 import { demoRequest } from "./handlers";
 import { buildSeed } from "./seed";
 
@@ -31,7 +31,10 @@ describe("credit transaction workflow (SRS 2.1, 2.3)", () => {
     expect(tx.total).toBe(1_700);
 
     await loginAs("abebe", "guest123");
-    const confirmed = await demoRequest<CreditTransaction>("POST", `/transactions/${tx.id}/confirm`);
+    const confirmed = await demoRequest<CreditTransaction>(
+      "POST",
+      `/transactions/${tx.id}/confirm`,
+    );
     expect(confirmed.status).toBe("pending_finance");
     expect((await account()).outstandingDebt).toBe(before.outstandingDebt);
 
@@ -41,10 +44,17 @@ describe("credit transaction workflow (SRS 2.1, 2.3)", () => {
 
   it("a dispute needs a written reason and returns the transaction to the cashier", async () => {
     await loginAs("cashier", "cashier123");
-    const tx = await demoRequest<CreditTransaction>("POST", "/transactions", { guestId: "g-01", items: [{ serviceId: "s-07", quantity: 1 }] });
+    const tx = await demoRequest<CreditTransaction>("POST", "/transactions", {
+      guestId: "g-01",
+      items: [{ serviceId: "s-07", quantity: 1 }],
+    });
     await loginAs("abebe", "guest123");
-    await expect(demoRequest("POST", `/transactions/${tx.id}/dispute`, { reason: "" })).rejects.toThrow(/reason/);
-    const d = await demoRequest<CreditTransaction>("POST", `/transactions/${tx.id}/dispute`, { reason: "I did not order this." });
+    await expect(
+      demoRequest("POST", `/transactions/${tx.id}/dispute`, { reason: "" }),
+    ).rejects.toThrow(/reason/);
+    const d = await demoRequest<CreditTransaction>("POST", `/transactions/${tx.id}/dispute`, {
+      reason: "I did not order this.",
+    });
     expect(d.status).toBe("disputed");
     await expect(demoRequest("POST", `/transactions/${tx.id}/confirm`)).rejects.toThrow();
   });
@@ -58,20 +68,32 @@ describe("credit transaction workflow (SRS 2.1, 2.3)", () => {
 
   it("transactions over available credit need an exceptional approval with a reason", async () => {
     await loginAs("cashier", "cashier123");
-    const tx = await demoRequest<CreditTransaction>("POST", "/transactions", { guestId: "g-01", items: [{ serviceId: "s-18", quantity: 20 }] });
+    const tx = await demoRequest<CreditTransaction>("POST", "/transactions", {
+      guestId: "g-01",
+      items: [{ serviceId: "s-18", quantity: 20 }],
+    });
     expect(tx.exceedsLimit).toBe(true);
     await loginAs("abebe", "guest123");
     const c = await demoRequest<CreditTransaction>("POST", `/transactions/${tx.id}/confirm`);
     expect(c.status).toBe("pending_exception");
     await loginAs("finance", "finance123");
-    await expect(demoRequest("POST", `/transactions/${tx.id}/approve`, {})).rejects.toThrow(/reason/);
-    const a = await demoRequest<CreditTransaction>("POST", `/transactions/${tx.id}/approve`, { reason: "Long-standing guest, CFO approved." });
+    await expect(demoRequest("POST", `/transactions/${tx.id}/approve`, {})).rejects.toThrow(
+      /reason/,
+    );
+    const a = await demoRequest<CreditTransaction>("POST", `/transactions/${tx.id}/approve`, {
+      reason: "Long-standing guest, CFO approved.",
+    });
     expect(a.exceptionApproval?.approvedBy).toBe("Meron Alemu");
   });
 
   it("partial payments reduce outstanding debt by the paid amount", async () => {
     const before = await account();
-    const p = await demoRequest<Payment>("POST", "/payments", { guestId: "g-01", amount: 8_000, method: "cash", verified: true });
+    const p = await demoRequest<Payment>("POST", "/payments", {
+      guestId: "g-01",
+      amount: 8_000,
+      method: "cash",
+      verified: true,
+    });
     expect(p.balanceAfter).toBe(before.outstandingDebt - 8_000);
     expect((await account()).outstandingDebt).toBe(before.outstandingDebt - 8_000);
   });
@@ -80,8 +102,32 @@ describe("credit transaction workflow (SRS 2.1, 2.3)", () => {
     await loginAs("cashier", "cashier123");
     const tx = await demoRequest<CreditTransaction>("POST", "/transactions", {
       guestId: "g-01",
-      items: [{ serviceId: "s-13", quantity: 1, requestedPrice: 4_000, priceReason: "Weekend promotion" }],
+      items: [
+        { serviceId: "s-13", quantity: 1, requestedPrice: 4_000, priceReason: "Weekend promotion" },
+      ],
     });
     expect(tx.status).toBe("pending_price_approval");
+  });
+
+  it("allows the creating cashier to update and cancel a draft transaction", async () => {
+    const cashier = await loginAs("cashier", "cashier123");
+    const tx = db().transactions[0];
+    expect(tx).toBeDefined();
+    tx!.status = "draft";
+    tx!.createdBy = cashier.user.fullName;
+
+    const updated = await demoRequest<CreditTransaction>("POST", `/transactions/${tx!.id}/draft`, {
+      items: [{ serviceId: "s-02", quantity: 2 }],
+      consumptionDate: "2026-01-10T12:00:00.000Z",
+    });
+    expect(updated.status).toBe("draft");
+    expect(updated.total).toBe(1_700);
+
+    const cancelled = await demoRequest<CreditTransaction>(
+      "POST",
+      `/transactions/${tx!.id}/cancel`,
+      { reason: "Duplicate draft" },
+    );
+    expect(cancelled.status).toBe("cancelled");
   });
 });

@@ -19,6 +19,8 @@ final class CreditAccountService
                 g.full_name,
                 u.username,
                 u.phone,
+                u.is_active,
+                u.created_at,
                 g.credit_limit,
                 COALESCE((SELECT SUM(ob.amount) FROM opening_balances ob
                     WHERE ob.guest_id = g.user_id AND ob.status = 'verified'), 0) AS historical_debt,
@@ -58,6 +60,8 @@ final class CreditAccountService
                 g.full_name,
                 u.username,
                 u.phone,
+                u.is_active,
+                u.created_at,
                 g.credit_limit,
                 COALESCE((SELECT SUM(ob.amount) FROM opening_balances ob
                     WHERE ob.guest_id = g.user_id AND ob.status = 'verified'), 0) AS historical_debt,
@@ -128,6 +132,8 @@ final class CreditAccountService
             'full_name' => $row['full_name'],
             'username' => $row['username'],
             'phone' => $row['phone'],
+            'is_active' => (bool) $row['is_active'],
+            'created_at' => $row['created_at'],
             'credit_limit' => Money::formatMinor($creditLimit),
             'historical_debt' => Money::formatMinor($historicalDebt),
             'approved_credit' => Money::formatMinor($approvedCredit),

@@ -6,8 +6,18 @@ import { SectionTitle } from "@/components/common/PageHeader";
 import { EmptyState } from "@/components/common/States";
 import { TxStatusBadge } from "@/components/common/StatusBadge";
 import { Badge } from "@/components/ui/badge";
-import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableFooter,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { cashierSafeNote } from "@/lib/cashier";
 import { date, dateTime, fromNow, money } from "@/lib/format";
+import { cn } from "@/lib/utils";
 import type { CreditTransaction } from "@/types";
 
 export function itemsSummary(tx: CreditTransaction) {
@@ -34,13 +44,16 @@ export function ItemsTable({ tx }: { tx: CreditTransaction }) {
                 <div className="text-xs capitalize text-muted-foreground">{i.category}</div>
                 {i.priceRequest && (
                   <div className="mt-1 text-xs text-info">
-                    Special price {i.priceRequest.status} · catalog {money(i.catalogPrice)} — “{i.priceRequest.reason}”
+                    Special price {i.priceRequest.status} · catalog {money(i.catalogPrice)} — “
+                    {i.priceRequest.reason}”
                   </div>
                 )}
               </TableCell>
               <TableCell className="text-right tabular-nums">{i.quantity}</TableCell>
               <TableCell className="text-right tabular-nums">{money(i.unitPrice)}</TableCell>
-              <TableCell className="text-right font-semibold tabular-nums">{money(i.total)}</TableCell>
+              <TableCell className="text-right font-semibold tabular-nums">
+                {money(i.total)}
+              </TableCell>
             </TableRow>
           ))}
         </TableBody>
@@ -49,7 +62,9 @@ export function ItemsTable({ tx }: { tx: CreditTransaction }) {
             <TableCell colSpan={3} className="text-right font-semibold">
               Transaction total
             </TableCell>
-            <TableCell className="text-right font-display text-lg font-semibold text-primary tabular-nums">{money(tx.total)}</TableCell>
+            <TableCell className="text-right font-display text-lg font-semibold text-primary tabular-nums">
+              {money(tx.total)}
+            </TableCell>
           </TableRow>
         </TableFooter>
       </Table>
@@ -57,29 +72,56 @@ export function ItemsTable({ tx }: { tx: CreditTransaction }) {
   );
 }
 
-export function Timeline({ tx }: { tx: CreditTransaction }) {
+export function Timeline({
+  tx,
+  showCreditAmounts = true,
+}: {
+  tx: CreditTransaction;
+  showCreditAmounts?: boolean;
+}) {
   if (tx.history.length === 0) {
-    return <p className="text-sm text-muted-foreground">No audit activity is recorded for this transaction.</p>;
+    return (
+      <p className="text-sm text-muted-foreground">
+        No audit activity is recorded for this transaction.
+      </p>
+    );
   }
   return (
     <ol className="relative space-y-5 border-l border-primary/20 pl-6">
-      {[...tx.history].reverse().map((h, i) => (
-        <li key={i} className="relative">
-          <span className="absolute -left-[31px] top-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-background ring-2 ring-primary/50">
-            <CircleDot className="h-2.5 w-2.5 text-primary" />
-          </span>
-          <div className="text-sm font-medium">{h.action}</div>
-          <div className="text-xs text-muted-foreground">
-            {h.by} · {dateTime(h.at)}
-          </div>
-          {h.note && <div className="mt-1 rounded-md bg-muted/60 px-3 py-2 text-xs text-muted-foreground">{h.note}</div>}
-        </li>
-      ))}
+      {[...tx.history].reverse().map((h, i) => {
+        const note = cashierSafeNote(h.note, showCreditAmounts);
+        return (
+          <li key={i} className="relative">
+            <span className="absolute -left-[31px] top-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-background ring-2 ring-primary/50">
+              <CircleDot className="h-2.5 w-2.5 text-primary" />
+            </span>
+            <div className="text-sm font-medium">{h.action}</div>
+            <div className="text-xs text-muted-foreground">
+              {h.by} · {dateTime(h.at)}
+            </div>
+            {note && (
+              <div className="mt-1 rounded-md bg-muted/60 px-3 py-2 text-xs text-muted-foreground">
+                {note}
+              </div>
+            )}
+          </li>
+        );
+      })}
     </ol>
   );
 }
 
-function Notice({ tone, icon, title, children }: { tone: "danger" | "success" | "info" | "warning"; icon: ReactNode; title: string; children: ReactNode }) {
+function Notice({
+  tone,
+  icon,
+  title,
+  children,
+}: {
+  tone: "danger" | "success" | "info" | "warning";
+  icon: ReactNode;
+  title: string;
+  children: ReactNode;
+}) {
   const cls = {
     danger: "border-destructive/30 bg-destructive/5 text-destructive",
     success: "border-success/30 bg-success/5 text-success",
@@ -97,32 +139,72 @@ function Notice({ tone, icon, title, children }: { tone: "danger" | "success" | 
   );
 }
 
-export function TransactionNotices({ tx }: { tx: CreditTransaction }) {
+export function TransactionNotices({
+  tx,
+  showCreditAmounts = true,
+}: {
+  tx: CreditTransaction;
+  showCreditAmounts?: boolean;
+}) {
   return (
     <div className="space-y-3 empty:hidden">
       {tx.status === "disputed" && tx.disputeReason && (
-        <Notice tone="danger" icon={<AlertTriangle className="h-4 w-4" />} title="Disputed by guest">
-          “{tx.disputeReason}”
+        <Notice
+          tone="danger"
+          icon={<AlertTriangle className="h-4 w-4" />}
+          title="Disputed by guest"
+        >
+          “{cashierSafeNote(tx.disputeReason, showCreditAmounts)}”
         </Notice>
       )}
-      {tx.exceedsLimit && !tx.exceptionApproval && tx.status !== "rejected" && tx.status !== "cancelled" && (
-        <Notice tone="warning" icon={<AlertTriangle className="h-4 w-4" />} title="Exceeds available credit">
-          Over the guest's available credit by <b>{money(tx.excessAmount)}</b>. Requires exceptional Finance Manager approval.
-        </Notice>
-      )}
+      {tx.exceedsLimit &&
+        !tx.exceptionApproval &&
+        tx.status !== "rejected" &&
+        tx.status !== "cancelled" && (
+          <Notice
+            tone="warning"
+            icon={<AlertTriangle className="h-4 w-4" />}
+            title={showCreditAmounts ? "Exceeds available credit" : "Credit limit exceeded"}
+          >
+            {showCreditAmounts ? (
+              <>
+                Over the guest's available credit by <b>{money(tx.excessAmount)}</b>. Requires
+                exceptional Finance Manager approval.
+              </>
+            ) : (
+              "Credit limit exceeded. Requires exceptional Finance Manager approval."
+            )}
+          </Notice>
+        )}
       {tx.exceptionApproval && (
-        <Notice tone="info" icon={<ShieldCheck className="h-4 w-4" />} title="Exceptional approval recorded">
-          Approved by {tx.exceptionApproval.approvedBy} on {dateTime(tx.exceptionApproval.at)} — “{tx.exceptionApproval.reason}”
+        <Notice
+          tone="info"
+          icon={<ShieldCheck className="h-4 w-4" />}
+          title="Exceptional approval recorded"
+        >
+          {showCreditAmounts
+            ? `Approved by ${tx.exceptionApproval.approvedBy} on ${dateTime(tx.exceptionApproval.at)} — “${tx.exceptionApproval.reason}”`
+            : `Approved by ${tx.exceptionApproval.approvedBy} on ${dateTime(tx.exceptionApproval.at)}.`}
         </Notice>
       )}
       {tx.status === "rejected" && tx.rejectionReason && (
         <Notice tone="danger" icon={<XCircle className="h-4 w-4" />} title="Rejected by Finance">
-          “{tx.rejectionReason}”
+          “{cashierSafeNote(tx.rejectionReason, showCreditAmounts)}”
         </Notice>
       )}
       {tx.status === "approved" && (
-        <Notice tone="success" icon={<BadgeCheck className="h-4 w-4" />} title="Approved and added to the guest's debt">
-          {tx.financeDecision ? `By ${tx.financeDecision.by} on ${dateTime(tx.financeDecision.at)}.` : "Approved."}
+        <Notice
+          tone="success"
+          icon={<BadgeCheck className="h-4 w-4" />}
+          title={
+            showCreditAmounts
+              ? "Approved and added to the guest's debt"
+              : "Approved and added to the guest's account"
+          }
+        >
+          {tx.financeDecision
+            ? `By ${tx.financeDecision.by} on ${dateTime(tx.financeDecision.at)}.`
+            : "Approved."}
         </Notice>
       )}
     </div>
@@ -133,23 +215,38 @@ export function TransactionDetail({
   tx,
   aside,
   creditSummary,
+  showCreditAmounts = true,
+  compact = false,
 }: {
   tx: CreditTransaction;
   aside?: ReactNode;
   creditSummary?: ReactNode | undefined;
+  showCreditAmounts?: boolean;
+  compact?: boolean;
 }) {
   return (
-    <div className="grid w-full min-w-0 grid-cols-1 gap-6 lg:grid-cols-12">
-      <div className="min-w-0 space-y-6 lg:col-span-10">
-        <Panel>
-          <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+    <div
+      className={cn("grid w-full min-w-0 grid-cols-1", compact ? "gap-3" : "gap-6 lg:grid-cols-12")}
+    >
+      <div className={cn("min-w-0", compact ? "space-y-3" : "space-y-6 lg:col-span-10")}>
+        <Panel className={compact ? "p-4 sm:p-4" : undefined}>
+          <div
+            className={cn(
+              "flex flex-wrap items-center justify-between gap-3",
+              compact ? "mb-3" : "mb-5",
+            )}
+          >
             <div>
-              <div className="text-xs uppercase tracking-widest text-muted-foreground">Transaction</div>
-              <div className="font-display text-3xl font-semibold">{tx.code}</div>
+              <div className="text-xs uppercase tracking-widest text-muted-foreground">
+                Transaction
+              </div>
+              <div className={cn("font-display font-semibold", compact ? "text-2xl" : "text-3xl")}>
+                {tx.code}
+              </div>
             </div>
             <TxStatusBadge status={tx.status} />
           </div>
-          <div className="grid grid-cols-2 gap-5 md:grid-cols-4">
+          <div className={cn("grid grid-cols-2", compact ? "gap-3" : "gap-5 md:grid-cols-4")}>
             <Field label="Guest" value={tx.guestName} />
             <Field label="Consumption date" value={date(tx.consumptionDate)} />
             <Field label="Recorded by" value={tx.createdBy} />
@@ -157,7 +254,11 @@ export function TransactionDetail({
             <Field label="Revision" value={tx.revision} />
             <Field
               label="Confirmation deadline"
-              value={tx.confirmationDeadline && tx.status === "pending_guest" ? `${dateTime(tx.confirmationDeadline)} (${fromNow(tx.confirmationDeadline)})` : "—"}
+              value={
+                tx.confirmationDeadline && tx.status === "pending_guest"
+                  ? `${dateTime(tx.confirmationDeadline)} (${fromNow(tx.confirmationDeadline)})`
+                  : "—"
+              }
             />
             <Field
               label="Guest confirmation"
@@ -168,7 +269,11 @@ export function TransactionDetail({
                       {tx.confirmation.method}
                     </Badge>
                     {dateTime(tx.confirmation.at)}
-                    {tx.confirmation.assistedBy && <span className="block text-xs text-muted-foreground">Assisted by {tx.confirmation.assistedBy}</span>}
+                    {tx.confirmation.assistedBy && (
+                      <span className="block text-xs text-muted-foreground">
+                        Assisted by {tx.confirmation.assistedBy}
+                      </span>
+                    )}
                   </span>
                 ) : (
                   "—"
@@ -178,36 +283,38 @@ export function TransactionDetail({
             <Field label="Total" value={<span className="text-primary">{money(tx.total)}</span>} />
           </div>
         </Panel>
-        <TransactionNotices tx={tx} />
+        <TransactionNotices tx={tx} showCreditAmounts={showCreditAmounts} />
       </div>
-      <div className="min-w-0 space-y-6 lg:col-span-4">
+      <div className={cn("min-w-0", compact ? "space-y-3" : "space-y-6 lg:col-span-4")}>
         {aside}
         {creditSummary}
       </div>
-      <div className="min-w-0 lg:col-span-10">
-        <SectionTitle title="Services" />
+      <div className={cn("min-w-0", !compact && "lg:col-span-10")}>
+        <SectionTitle title="Services" compact={compact} />
         <ItemsTable tx={tx} />
       </div>
-      <div className="min-w-0 lg:col-span-10">
-        <Panel className="min-w-0">
-          <SectionTitle title="Audit trail" />
-          <Timeline tx={tx} />
+      <div className={cn("min-w-0", !compact && "lg:col-span-10")}>
+        <Panel className={compact ? "min-w-0 p-4 sm:p-4" : "min-w-0"}>
+          <SectionTitle title="Audit trail" compact={compact} />
+          <Timeline tx={tx} showCreditAmounts={showCreditAmounts} />
         </Panel>
       </div>
     </div>
   );
 }
 
-/** Compact table of transactions with links to a details page. */
+/** Compact transaction table with optional row-click details. */
 export function TransactionsTable({
   rows,
   detailTo,
+  onRowClick,
   showGuest = true,
   actions,
   empty = "No transactions found.",
 }: {
   rows: CreditTransaction[];
   detailTo?: "/cashier/transactions/$id" | "/finance/transactions/$id";
+  onRowClick?: ((tx: CreditTransaction) => void) | undefined;
   showGuest?: boolean;
   actions?: (tx: CreditTransaction) => ReactNode;
   empty?: string;
@@ -229,10 +336,52 @@ export function TransactionsTable({
         </TableHeader>
         <TableBody>
           {rows.map((t) => (
-            <TableRow key={t.id}>
+            <TableRow
+              key={t.id}
+              className={
+                onRowClick
+                  ? "cursor-pointer transition-colors hover:bg-muted/60 focus-visible:bg-muted/60 focus-visible:outline-none"
+                  : undefined
+              }
+              tabIndex={onRowClick ? 0 : undefined}
+              aria-label={onRowClick ? `View transaction ${t.code}` : undefined}
+              onClick={
+                onRowClick
+                  ? (event) => {
+                      if (
+                        event.target instanceof Element &&
+                        event.target.closest("button, a, input, select, textarea")
+                      ) {
+                        return;
+                      }
+                      onRowClick(t);
+                    }
+                  : undefined
+              }
+              onKeyDown={
+                onRowClick
+                  ? (event) => {
+                      if (
+                        event.target instanceof Element &&
+                        event.target.closest("button, a, input, select, textarea")
+                      ) {
+                        return;
+                      }
+                      if (event.key === "Enter" || event.key === " ") {
+                        event.preventDefault();
+                        onRowClick(t);
+                      }
+                    }
+                  : undefined
+              }
+            >
               <TableCell className="font-semibold">
-                {detailTo ? (
-                  <Link to={detailTo} params={{ id: t.id }} className="text-primary hover:underline">
+                {detailTo && !onRowClick ? (
+                  <Link
+                    to={detailTo}
+                    params={{ id: t.id }}
+                    className="text-primary hover:underline"
+                  >
                     {t.code}
                   </Link>
                 ) : (
@@ -242,7 +391,9 @@ export function TransactionsTable({
               {showGuest && <TableCell className="whitespace-nowrap">{t.guestName}</TableCell>}
               <TableCell className="text-sm text-muted-foreground">{itemsSummary(t)}</TableCell>
               <TableCell className="whitespace-nowrap text-sm">{date(t.consumptionDate)}</TableCell>
-              <TableCell className="text-right font-semibold tabular-nums">{money(t.total)}</TableCell>
+              <TableCell className="text-right font-semibold tabular-nums">
+                {money(t.total)}
+              </TableCell>
               <TableCell>
                 <TxStatusBadge status={t.status} />
               </TableCell>

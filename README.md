@@ -5,7 +5,7 @@ Pure PHP 8.1+ JSON API backed by MySQL 8.0.16+, with the role-based browser UI i
 ## Install
 
 1. Create a MySQL database and application user. Run `database/schema.sql` as a database administrator. The schema creates `haroni_dcms`, its tables, constraints, initial service categories, and the ETB 11,000,000 historical-debt reconciliation target.
-2. Copy `backend/.env.example` to `backend/.env` and set `DB_DSN`, `DB_USERNAME`, and `DB_PASSWORD`. Use a dedicated database account. Configure `DCMS_BACKUP_DIR` as an absolute path outside the project and document root, and make it writable only by the backend service account. Install `mysqldump` where the backend can run it and configure `DCMS_BACKUP_DB_USERNAME` and `DCMS_BACKUP_DB_PASSWORD` for backup access. After importing the schema, grant the application only the required `SELECT`, `INSERT`, and `UPDATE` privileges, with `DELETE` limited to `login_attempts`, `confirmation_pin_attempts`, and `credit_transaction_items`. These are needed for rate-limit cleanup and correcting disputed, unapproved transactions; database triggers prevent deletion or editing of posted financial records. Existing installations must apply any pending scripts in `database/migrations/` once, including `001-add-pin-attempt-updated-at.sql`, `002-add-admin-profile-settings.sql`, `003-transaction-special-price-requests.sql`, and `004-allow-special-price-status-transitions.sql`.
+2. Copy `backend/.env.example` to `backend/.env` and set `DB_DSN`, `DB_USERNAME`, and `DB_PASSWORD`. Use a dedicated database account. Configure `DCMS_BACKUP_DIR` as an absolute path outside the project and document root, and make it writable only by the backend service account. Install `mysqldump` where the backend can run it and configure `DCMS_BACKUP_DB_USERNAME` and `DCMS_BACKUP_DB_PASSWORD` for backup access. After importing the schema, grant the application only the required `SELECT`, `INSERT`, and `UPDATE` privileges, with `DELETE` limited to `login_attempts`, `confirmation_pin_attempts`, `credit_transaction_items`, and `notifications`. These are needed for rate-limit cleanup, notification management, and correcting disputed, unapproved transactions; database triggers prevent deletion or editing of posted financial records. For an existing installation whose application user is `dcms_app`@`localhost`, a database administrator can enable notification deletion with `GRANT DELETE ON haroni_dcms.notifications TO 'dcms_app'@'localhost';`. Existing installations must apply any pending scripts in `database/migrations/` once, including `001-add-pin-attempt-updated-at.sql`, `002-add-admin-profile-settings.sql`, `003-transaction-special-price-requests.sql`, and `004-allow-special-price-status-transitions.sql`.
 3. Configure Apache with `mod_rewrite` and `AllowOverride All`, or configure an equivalent Nginx front controller. Point the site root at `backend/public/` and serve it only over HTTPS.
 4. Configure PHP with `pdo_mysql`, `mbstring`, and sessions. `iconv` is optional; without it, non-ASCII receipt and report text is replaced with ASCII placeholders.
 5. Create the first System Administrator once. In PowerShell, enter a 12-72 byte password using a secure prompt and remove the temporary environment variables immediately afterward:
@@ -59,7 +59,7 @@ Only the System Administrator can create guest accounts and staff accounts. New 
 |---|---|---|
 | GET | `/api/guests[?q=...]` | Cashier, Finance Manager |
 | GET | `/api/credit-account` | Guest (own account) |
-| GET | `/api/credit-account/{guestId}` | Cashier, Finance Manager |
+| GET | `/api/credit-account/{guestId}` | Finance Manager |
 | POST | `/api/guests/{guestId}/credit-limit` | Finance Manager |
 | GET | `/api/service-catalog` | Authenticated |
 | GET | `/api/service-categories` | System Administrator, Cashier, Finance Manager |
@@ -73,6 +73,8 @@ Only the System Administrator can create guest accounts and staff accounts. New 
 | GET | `/api/service-price-requests` | Finance Manager |
 | POST | `/api/service-price-requests/{id}/approve` or `/reject` | Finance Manager |
 | GET | `/api/transactions[?status=...]` | Guest, Cashier, Finance Manager |
+
+Cashier guest search returns guest identity and account status only; credit figures are restricted to Finance Manager endpoints. Credit-limit checks are performed by the backend when a transaction is submitted.
 | POST | `/api/transactions` | Cashier |
 | POST | `/api/transactions/{id}/draft` | Creating Cashier |
 | POST | `/api/transactions/{id}/submit` | Creating Cashier |
@@ -107,7 +109,8 @@ Create a transaction with `guest_id`, `consumption_date` (`YYYY-MM-DD`), and `it
 | GET | `/api/reports/guest-debts[.xls\|.pdf]` | Finance Manager |
 | GET | `/api/audit-logs` | System Administrator, Finance Manager |
 | GET | `/api/notifications` | Authenticated |
-| POST | `/api/notifications/{id}/read` | Owning User |
+| POST | `/api/notifications/{id}/read` or `/api/notifications/{id}/delete` | Owning User |
+| POST | `/api/notifications/clear` | Authenticated User (own notifications) |
 
 Payments remain pending until verified, and verification cannot reduce debt below zero. Verified payments generate downloadable PDF receipts with their balance snapshots. Historical debt is entered as a separate pending opening balance with a supporting reference; only verified entries affect debt or reconciliation. `/api/guests/{id}/statement.xls` produces an Excel-compatible XML workbook.
 

@@ -1,5 +1,4 @@
 import { useSuspenseQuery } from "@tanstack/react-query";
-import { createFileRoute } from "@tanstack/react-router";
 import { KeyRound, MoreHorizontal, Pencil, Plus, Power } from "lucide-react";
 import { useState } from "react";
 import { FormDialog, TextField } from "@/components/common/FormDialog";
@@ -15,21 +14,14 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { useAction } from "@/hooks/use-action";
 import { date } from "@/lib/format";
 import { q } from "@/lib/queries";
-import { pageHead } from "@/lib/seo";
 import { guestsService, type GuestInput } from "@/services/guests.service";
 import { USE_DEMO_BACKEND } from "@/services/config";
 import type { AccountStatus, Guest } from "@/types";
-import { ResetPasswordDialog } from "./users";
-
-export const Route = createFileRoute("/_portal/admin/guests")({
-  head: () => pageHead("Guest Accounts", "Register and manage guest accounts for Haroni Hotel credit."),
-  loader: ({ context }) => context.queryClient.ensureQueryData(q.guestsBasic()),
-  component: GuestsPage,
-});
+import { ResetPasswordDialog } from "@/components/admin/UserManagement";
 
 const STATUSES: AccountStatus[] = USE_DEMO_BACKEND ? ["active", "inactive", "suspended"] : ["active", "inactive"];
 
-function GuestsPage() {
+export function GuestsPage() {
   const { data: guests } = useSuspenseQuery(q.guestsBasic());
   const [search, setSearch] = useState("");
   const [status, setStatusFilter] = useState<AccountStatus | "all">("all");
@@ -130,7 +122,17 @@ function GuestsPage() {
   );
 }
 
-function GuestDialog({ guest, onClose }: { guest: Guest | null; onClose: () => void }) {
+export function GuestDialog({
+  guest,
+  onClose,
+  nested = false,
+  deep = false,
+}: {
+  guest: Guest | null;
+  onClose: () => void;
+  nested?: boolean;
+  deep?: boolean;
+}) {
   const [f, setF] = useState<GuestInput>({ fullName: guest?.fullName ?? "", phone: guest?.phone ?? "", username: guest?.username ?? "", password: "", pin: "" });
   const save = useAction(
     () =>
@@ -142,6 +144,8 @@ function GuestDialog({ guest, onClose }: { guest: Guest | null; onClose: () => v
   return (
     <FormDialog
       open
+      nested={nested}
+      deep={deep}
       onOpenChange={(o) => !o && onClose()}
       title={guest ? "Edit guest" : "Register guest"}
       {...(guest ? {} : { description: USE_DEMO_BACKEND ? "The guest signs in with this username and password, and uses the PIN to confirm charges at the desk." : "The guest sets their confirmation PIN after signing in for the first time." })}

@@ -82,7 +82,10 @@ final class UserManagementService
     {
         return $this->pdo->query(
             'SELECT u.id, u.username, u.full_name, u.role, u.phone, u.is_active, u.must_change_password,
-                    u.created_at
+                    u.created_at,
+                    (SELECT MAX(a.created_at)
+                     FROM audit_logs a
+                     WHERE a.actor_id = u.id AND a.action = \'login\' AND a.entity_type = \'user\') AS last_login_at
              FROM users u ORDER BY u.created_at DESC LIMIT 1000'
         )->fetchAll();
     }

@@ -7,6 +7,7 @@ import { guestsService } from "@/services/guests.service";
 import { systemService } from "@/services/system.service";
 import { transactionsService, type TransactionFilter } from "@/services/transactions.service";
 import { usersService } from "@/services/users.service";
+import { readSession } from "@/services/session";
 import type { ReportPeriod, ReportType } from "@/types";
 
 export const q = {
@@ -18,7 +19,10 @@ export const q = {
   users: () => queryOptions({ queryKey: ["users"], queryFn: usersService.list }),
   guestsBasic: () => queryOptions({ queryKey: ["guests", "basic"], queryFn: guestsService.listBasic }),
   guestAccounts: (search = "") =>
-    queryOptions({ queryKey: ["guests", "accounts", search], queryFn: () => guestsService.search(search || undefined) }),
+    queryOptions({
+      queryKey: ["guests", "accounts", readSession()?.user.role ?? "anonymous", search],
+      queryFn: () => guestsService.search(search || undefined),
+    }),
   guestDetail: (id: string) =>
     queryOptions({
       queryKey: ["guests", "detail", id],
@@ -28,12 +32,20 @@ export const q = {
     }),
   limitHistory: () => queryOptions({ queryKey: ["credit-limits", "history"], queryFn: guestsService.limitHistory }),
 
-  services: () => queryOptions({ queryKey: ["services"], queryFn: catalogService.list }),
+  services: () =>
+    queryOptions({
+      queryKey: ["services", readSession()?.user.role ?? "anonymous"],
+      queryFn: catalogService.list,
+    }),
   priceRequests: () => queryOptions({ queryKey: ["price-requests"], queryFn: catalogService.priceRequests }),
 
   transactions: (f: TransactionFilter = {}) =>
     queryOptions({ queryKey: ["transactions", f], queryFn: () => transactionsService.list(f) }),
-  transaction: (id: string) => queryOptions({ queryKey: ["transactions", "one", id], queryFn: () => transactionsService.get(id) }),
+  transaction: (id: string) =>
+    queryOptions({
+      queryKey: ["transactions", "one", readSession()?.user.role ?? "anonymous", id],
+      queryFn: () => transactionsService.get(id),
+    }),
 
   payments: (guestId?: string) =>
     queryOptions({

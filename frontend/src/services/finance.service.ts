@@ -304,4 +304,9 @@ export const guestSelfService = {
     await Promise.all(unread.map((notification) => api.post(`/notifications/${notification.id}/read`)));
     return { ok: true as const };
   },
+  deleteNotification: (id: string) =>
+    api.post<{ ok: true }>(
+      `${USE_DEMO_BACKEND ? "/me/notifications" : "/notifications"}/${encodeURIComponent(id)}/delete`,
+    ),
+  clearNotifications: () => api.post<{ ok: true }>(`${USE_DEMO_BACKEND ? "/me/notifications" : "/notifications"}/clear`),
 };

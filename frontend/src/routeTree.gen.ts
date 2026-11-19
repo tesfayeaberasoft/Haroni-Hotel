@@ -11,18 +11,10 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as PortalRouteRouteImport } from './routes/_portal/route'
-import { Route as PortalAdminRouteRouteImport } from './routes/_portal/admin/route'
 import { Route as PortalCashierRouteRouteImport } from './routes/_portal/cashier/route'
 import { Route as PortalFinanceRouteRouteImport } from './routes/_portal/finance/route'
 import { Route as PortalGuestRouteRouteImport } from './routes/_portal/guest/route'
 import { Route as PortalProfileRouteImport } from './routes/_portal/profile'
-import { Route as PortalAdminIndexRouteImport } from './routes/_portal/admin/index'
-import { Route as PortalAdminAuditRouteImport } from './routes/_portal/admin/audit'
-import { Route as PortalAdminBackupRouteImport } from './routes/_portal/admin/backup'
-import { Route as PortalAdminGuestsRouteImport } from './routes/_portal/admin/guests'
-import { Route as PortalAdminServicesRouteImport } from './routes/_portal/admin/services'
-import { Route as PortalAdminSettingsRouteImport } from './routes/_portal/admin/settings'
-import { Route as PortalAdminUsersRouteImport } from './routes/_portal/admin/users'
 import { Route as PortalCashierIndexRouteImport } from './routes/_portal/cashier/index'
 import { Route as PortalCashierGuestsRouteImport } from './routes/_portal/cashier/guests'
 import { Route as PortalCashierHistoryRouteImport } from './routes/_portal/cashier/history'
@@ -57,11 +49,6 @@ const PortalRouteRoute = PortalRouteRouteImport.update({
   id: '/_portal',
   getParentRoute: () => rootRouteImport,
 } as any)
-const PortalAdminRouteRoute = PortalAdminRouteRouteImport.update({
-  id: '/admin',
-  path: '/admin',
-  getParentRoute: () => PortalRouteRoute,
-} as any)
 const PortalCashierRouteRoute = PortalCashierRouteRouteImport.update({
   id: '/cashier',
   path: '/cashier',
@@ -81,41 +68,6 @@ const PortalProfileRoute = PortalProfileRouteImport.update({
   id: '/profile',
   path: '/profile',
   getParentRoute: () => PortalRouteRoute,
-} as any)
-const PortalAdminIndexRoute = PortalAdminIndexRouteImport.update({
-  id: '/',
-  path: '/',
-  getParentRoute: () => PortalAdminRouteRoute,
-} as any)
-const PortalAdminAuditRoute = PortalAdminAuditRouteImport.update({
-  id: '/audit',
-  path: '/audit',
-  getParentRoute: () => PortalAdminRouteRoute,
-} as any)
-const PortalAdminBackupRoute = PortalAdminBackupRouteImport.update({
-  id: '/backup',
-  path: '/backup',
-  getParentRoute: () => PortalAdminRouteRoute,
-} as any)
-const PortalAdminGuestsRoute = PortalAdminGuestsRouteImport.update({
-  id: '/guests',
-  path: '/guests',
-  getParentRoute: () => PortalAdminRouteRoute,
-} as any)
-const PortalAdminServicesRoute = PortalAdminServicesRouteImport.update({
-  id: '/services',
-  path: '/services',
-  getParentRoute: () => PortalAdminRouteRoute,
-} as any)
-const PortalAdminSettingsRoute = PortalAdminSettingsRouteImport.update({
-  id: '/settings',
-  path: '/settings',
-  getParentRoute: () => PortalAdminRouteRoute,
-} as any)
-const PortalAdminUsersRoute = PortalAdminUsersRouteImport.update({
-  id: '/users',
-  path: '/users',
-  getParentRoute: () => PortalAdminRouteRoute,
 } as any)
 const PortalCashierIndexRoute = PortalCashierIndexRouteImport.update({
   id: '/',
@@ -244,17 +196,10 @@ const PortalFinanceTransactionsIdRoute =
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
-  '/admin': typeof PortalAdminRouteRouteWithChildren
   '/cashier': typeof PortalCashierRouteRouteWithChildren
   '/finance': typeof PortalFinanceRouteRouteWithChildren
   '/guest': typeof PortalGuestRouteRouteWithChildren
   '/profile': typeof PortalProfileRoute
-  '/admin/audit': typeof PortalAdminAuditRoute
-  '/admin/backup': typeof PortalAdminBackupRoute
-  '/admin/guests': typeof PortalAdminGuestsRoute
-  '/admin/services': typeof PortalAdminServicesRoute
-  '/admin/settings': typeof PortalAdminSettingsRoute
-  '/admin/users': typeof PortalAdminUsersRoute
   '/cashier/guests': typeof PortalCashierGuestsRoute
   '/cashier/history': typeof PortalCashierHistoryRoute
   '/cashier/new': typeof PortalCashierNewRoute
@@ -272,7 +217,6 @@ export interface FileRoutesByFullPath {
   '/guest/payments': typeof PortalGuestPaymentsRoute
   '/guest/pending': typeof PortalGuestPendingRoute
   '/guest/receipts': typeof PortalGuestReceiptsRoute
-  '/admin/': typeof PortalAdminIndexRoute
   '/cashier/': typeof PortalCashierIndexRoute
   '/finance/': typeof PortalFinanceIndexRoute
   '/guest/': typeof PortalGuestIndexRoute
@@ -284,12 +228,6 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/profile': typeof PortalProfileRoute
-  '/admin/audit': typeof PortalAdminAuditRoute
-  '/admin/backup': typeof PortalAdminBackupRoute
-  '/admin/guests': typeof PortalAdminGuestsRoute
-  '/admin/services': typeof PortalAdminServicesRoute
-  '/admin/settings': typeof PortalAdminSettingsRoute
-  '/admin/users': typeof PortalAdminUsersRoute
   '/cashier/guests': typeof PortalCashierGuestsRoute
   '/cashier/history': typeof PortalCashierHistoryRoute
   '/cashier/new': typeof PortalCashierNewRoute
@@ -307,7 +245,6 @@ export interface FileRoutesByTo {
   '/guest/payments': typeof PortalGuestPaymentsRoute
   '/guest/pending': typeof PortalGuestPendingRoute
   '/guest/receipts': typeof PortalGuestReceiptsRoute
-  '/admin': typeof PortalAdminIndexRoute
   '/cashier': typeof PortalCashierIndexRoute
   '/finance': typeof PortalFinanceIndexRoute
   '/guest': typeof PortalGuestIndexRoute
@@ -320,17 +257,10 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/_portal': typeof PortalRouteRouteWithChildren
-  '/_portal/admin': typeof PortalAdminRouteRouteWithChildren
   '/_portal/cashier': typeof PortalCashierRouteRouteWithChildren
   '/_portal/finance': typeof PortalFinanceRouteRouteWithChildren
   '/_portal/guest': typeof PortalGuestRouteRouteWithChildren
   '/_portal/profile': typeof PortalProfileRoute
-  '/_portal/admin/audit': typeof PortalAdminAuditRoute
-  '/_portal/admin/backup': typeof PortalAdminBackupRoute
-  '/_portal/admin/guests': typeof PortalAdminGuestsRoute
-  '/_portal/admin/services': typeof PortalAdminServicesRoute
-  '/_portal/admin/settings': typeof PortalAdminSettingsRoute
-  '/_portal/admin/users': typeof PortalAdminUsersRoute
   '/_portal/cashier/guests': typeof PortalCashierGuestsRoute
   '/_portal/cashier/history': typeof PortalCashierHistoryRoute
   '/_portal/cashier/new': typeof PortalCashierNewRoute
@@ -348,7 +278,6 @@ export interface FileRoutesById {
   '/_portal/guest/payments': typeof PortalGuestPaymentsRoute
   '/_portal/guest/pending': typeof PortalGuestPendingRoute
   '/_portal/guest/receipts': typeof PortalGuestReceiptsRoute
-  '/_portal/admin/': typeof PortalAdminIndexRoute
   '/_portal/cashier/': typeof PortalCashierIndexRoute
   '/_portal/finance/': typeof PortalFinanceIndexRoute
   '/_portal/guest/': typeof PortalGuestIndexRoute
@@ -361,17 +290,10 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
-    | '/admin'
     | '/cashier'
     | '/finance'
     | '/guest'
     | '/profile'
-    | '/admin/audit'
-    | '/admin/backup'
-    | '/admin/guests'
-    | '/admin/services'
-    | '/admin/settings'
-    | '/admin/users'
     | '/cashier/guests'
     | '/cashier/history'
     | '/cashier/new'
@@ -389,7 +311,6 @@ export interface FileRouteTypes {
     | '/guest/payments'
     | '/guest/pending'
     | '/guest/receipts'
-    | '/admin/'
     | '/cashier/'
     | '/finance/'
     | '/guest/'
@@ -401,12 +322,6 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/profile'
-    | '/admin/audit'
-    | '/admin/backup'
-    | '/admin/guests'
-    | '/admin/services'
-    | '/admin/settings'
-    | '/admin/users'
     | '/cashier/guests'
     | '/cashier/history'
     | '/cashier/new'
@@ -424,7 +339,6 @@ export interface FileRouteTypes {
     | '/guest/payments'
     | '/guest/pending'
     | '/guest/receipts'
-    | '/admin'
     | '/cashier'
     | '/finance'
     | '/guest'
@@ -436,17 +350,10 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/_portal'
-    | '/_portal/admin'
     | '/_portal/cashier'
     | '/_portal/finance'
     | '/_portal/guest'
     | '/_portal/profile'
-    | '/_portal/admin/audit'
-    | '/_portal/admin/backup'
-    | '/_portal/admin/guests'
-    | '/_portal/admin/services'
-    | '/_portal/admin/settings'
-    | '/_portal/admin/users'
     | '/_portal/cashier/guests'
     | '/_portal/cashier/history'
     | '/_portal/cashier/new'
@@ -464,7 +371,6 @@ export interface FileRouteTypes {
     | '/_portal/guest/payments'
     | '/_portal/guest/pending'
     | '/_portal/guest/receipts'
-    | '/_portal/admin/'
     | '/_portal/cashier/'
     | '/_portal/finance/'
     | '/_portal/guest/'
@@ -495,13 +401,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PortalRouteRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/_portal/admin': {
-      id: '/_portal/admin'
-      path: '/admin'
-      fullPath: '/admin'
-      preLoaderRoute: typeof PortalAdminRouteRouteImport
-      parentRoute: typeof PortalRouteRoute
-    }
     '/_portal/cashier': {
       id: '/_portal/cashier'
       path: '/cashier'
@@ -529,55 +428,6 @@ declare module '@tanstack/react-router' {
       fullPath: '/profile'
       preLoaderRoute: typeof PortalProfileRouteImport
       parentRoute: typeof PortalRouteRoute
-    }
-    '/_portal/admin/': {
-      id: '/_portal/admin/'
-      path: '/'
-      fullPath: '/admin/'
-      preLoaderRoute: typeof PortalAdminIndexRouteImport
-      parentRoute: typeof PortalAdminRouteRoute
-    }
-    '/_portal/admin/audit': {
-      id: '/_portal/admin/audit'
-      path: '/audit'
-      fullPath: '/admin/audit'
-      preLoaderRoute: typeof PortalAdminAuditRouteImport
-      parentRoute: typeof PortalAdminRouteRoute
-    }
-    '/_portal/admin/backup': {
-      id: '/_portal/admin/backup'
-      path: '/backup'
-      fullPath: '/admin/backup'
-      preLoaderRoute: typeof PortalAdminBackupRouteImport
-      parentRoute: typeof PortalAdminRouteRoute
-    }
-    '/_portal/admin/guests': {
-      id: '/_portal/admin/guests'
-      path: '/guests'
-      fullPath: '/admin/guests'
-      preLoaderRoute: typeof PortalAdminGuestsRouteImport
-      parentRoute: typeof PortalAdminRouteRoute
-    }
-    '/_portal/admin/services': {
-      id: '/_portal/admin/services'
-      path: '/services'
-      fullPath: '/admin/services'
-      preLoaderRoute: typeof PortalAdminServicesRouteImport
-      parentRoute: typeof PortalAdminRouteRoute
-    }
-    '/_portal/admin/settings': {
-      id: '/_portal/admin/settings'
-      path: '/settings'
-      fullPath: '/admin/settings'
-      preLoaderRoute: typeof PortalAdminSettingsRouteImport
-      parentRoute: typeof PortalAdminRouteRoute
-    }
-    '/_portal/admin/users': {
-      id: '/_portal/admin/users'
-      path: '/users'
-      fullPath: '/admin/users'
-      preLoaderRoute: typeof PortalAdminUsersRouteImport
-      parentRoute: typeof PortalAdminRouteRoute
     }
     '/_portal/cashier/': {
       id: '/_portal/cashier/'
@@ -750,29 +600,6 @@ declare module '@tanstack/react-router' {
   }
 }
 
-interface PortalAdminRouteRouteChildren {
-  PortalAdminAuditRoute: typeof PortalAdminAuditRoute
-  PortalAdminBackupRoute: typeof PortalAdminBackupRoute
-  PortalAdminGuestsRoute: typeof PortalAdminGuestsRoute
-  PortalAdminServicesRoute: typeof PortalAdminServicesRoute
-  PortalAdminSettingsRoute: typeof PortalAdminSettingsRoute
-  PortalAdminUsersRoute: typeof PortalAdminUsersRoute
-  PortalAdminIndexRoute: typeof PortalAdminIndexRoute
-}
-
-const PortalAdminRouteRouteChildren: PortalAdminRouteRouteChildren = {
-  PortalAdminAuditRoute: PortalAdminAuditRoute,
-  PortalAdminBackupRoute: PortalAdminBackupRoute,
-  PortalAdminGuestsRoute: PortalAdminGuestsRoute,
-  PortalAdminServicesRoute: PortalAdminServicesRoute,
-  PortalAdminSettingsRoute: PortalAdminSettingsRoute,
-  PortalAdminUsersRoute: PortalAdminUsersRoute,
-  PortalAdminIndexRoute: PortalAdminIndexRoute,
-}
-
-const PortalAdminRouteRouteWithChildren =
-  PortalAdminRouteRoute._addFileChildren(PortalAdminRouteRouteChildren)
-
 interface PortalCashierRouteRouteChildren {
   PortalCashierGuestsRoute: typeof PortalCashierGuestsRoute
   PortalCashierHistoryRoute: typeof PortalCashierHistoryRoute
@@ -849,7 +676,6 @@ const PortalGuestRouteRouteWithChildren =
   PortalGuestRouteRoute._addFileChildren(PortalGuestRouteRouteChildren)
 
 interface PortalRouteRouteChildren {
-  PortalAdminRouteRoute: typeof PortalAdminRouteRouteWithChildren
   PortalCashierRouteRoute: typeof PortalCashierRouteRouteWithChildren
   PortalFinanceRouteRoute: typeof PortalFinanceRouteRouteWithChildren
   PortalGuestRouteRoute: typeof PortalGuestRouteRouteWithChildren
@@ -857,7 +683,6 @@ interface PortalRouteRouteChildren {
 }
 
 const PortalRouteRouteChildren: PortalRouteRouteChildren = {
-  PortalAdminRouteRoute: PortalAdminRouteRouteWithChildren,
   PortalCashierRouteRoute: PortalCashierRouteRouteWithChildren,
   PortalFinanceRouteRoute: PortalFinanceRouteRouteWithChildren,
   PortalGuestRouteRoute: PortalGuestRouteRouteWithChildren,

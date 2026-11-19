@@ -31,4 +31,13 @@ describe("usePaginatedItems", () => {
     expect(result.current.currentPage).toBe(2);
     expect(result.current.currentItems).toEqual(items.slice(10, 15));
   });
+
+  it("supports a custom page size", () => {
+    const items = Array.from({ length: 14 }, (_, index) => index + 1);
+    const { result } = renderHook(() => usePaginatedItems(items, "", 6));
+
+    expect(result.current.currentItems).toEqual(items.slice(0, 6));
+    act(() => result.current.onPageChange(2));
+    expect(result.current.currentItems).toEqual(items.slice(6, 12));
+  });
 });

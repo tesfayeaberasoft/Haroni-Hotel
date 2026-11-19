@@ -17,34 +17,41 @@ import type { AuthUser } from "@/types";
 import { NAV } from "./nav";
 
 function NavList({ user, onNavigate }: { user: AuthUser; onNavigate?: () => void }) {
+  const items = NAV[user.role].flatMap((group) => group.items);
   return (
     <nav className="flex-1 space-y-6 overflow-y-auto px-3 py-6">
-      {NAV[user.role].map((group) => (
-        <div key={group.label}>
-          <div className="mb-2 px-3 text-[10px] font-semibold uppercase tracking-[0.26em] text-muted-foreground/70">{group.label}</div>
-          <ul className="space-y-0.5">
-            {group.items.map((item) => (
-              <li key={item.to}>
-                <Link
-                  to={item.to}
-                  onClick={onNavigate}
-                  activeOptions={{ exact: item.exact ?? false }}
-                  className="group flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-sidebar-foreground/80 transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-                  activeProps={{ className: "bg-sidebar-accent text-sidebar-accent-foreground font-semibold ring-1 ring-sidebar-border" }}
-                >
-                  <item.icon className="h-4 w-4 shrink-0 text-primary/70 transition-colors group-hover:text-primary" />
-                  {item.label}
-                </Link>
-              </li>
-            ))}
-          </ul>
-        </div>
-      ))}
+      <ul className="space-y-0.5">
+        {items.map((item) => (
+          <li key={item.to}>
+            <Link
+              to={item.to}
+              onClick={onNavigate}
+              activeOptions={{ exact: item.exact ?? false }}
+              className="group flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-sidebar-foreground/80 transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+              activeProps={{
+                className:
+                  "bg-sidebar-accent text-sidebar-accent-foreground font-semibold ring-1 ring-sidebar-border",
+              }}
+            >
+              <item.icon className="h-4 w-4 shrink-0 text-primary/70 transition-colors group-hover:text-primary" />
+              {item.label}
+            </Link>
+          </li>
+        ))}
+      </ul>
     </nav>
   );
 }
 
-function SidebarBody({ user, onNavigate, onSignOut }: { user: AuthUser; onNavigate?: () => void; onSignOut: () => void }) {
+function SidebarBody({
+  user,
+  onNavigate,
+  onSignOut,
+}: {
+  user: AuthUser;
+  onNavigate?: () => void;
+  onSignOut: () => void;
+}) {
   return (
     <div className="flex h-full flex-col">
       <div className="border-b border-sidebar-border px-6 py-6">
@@ -66,7 +73,11 @@ function SidebarBody({ user, onNavigate, onSignOut }: { user: AuthUser; onNaviga
             <div className="truncate text-xs text-muted-foreground">{ROLE_LABEL[user.role]}</div>
           </div>
         </Link>
-        <Button variant="ghost" className="mt-1 w-full justify-start gap-3 px-3 text-muted-foreground" onClick={onSignOut}>
+        <Button
+          variant="ghost"
+          className="mt-1 w-full justify-start gap-3 px-3 text-muted-foreground"
+          onClick={onSignOut}
+        >
           <LogOut className="h-4 w-4" /> Sign out
         </Button>
       </div>
@@ -100,9 +111,16 @@ function GuestNotifications() {
       <PopoverContent align="end" className="w-80 border-primary/20 p-0">
         <div className="border-b px-4 py-3 font-display text-lg font-semibold">Notifications</div>
         <div className="max-h-80 overflow-y-auto">
-          {data.length === 0 && <div className="px-4 py-8 text-center text-sm text-muted-foreground">You're all caught up.</div>}
+          {data.length === 0 && (
+            <div className="px-4 py-8 text-center text-sm text-muted-foreground">
+              You're all caught up.
+            </div>
+          )}
           {data.map((n) => (
-            <div key={n.id} className={cn("border-b px-4 py-3 last:border-0", !n.read && "bg-primary/5")}>
+            <div
+              key={n.id}
+              className={cn("border-b px-4 py-3 last:border-0", !n.read && "bg-primary/5")}
+            >
               <div className="flex items-center justify-between gap-2">
                 <div className="text-sm font-semibold">{n.title}</div>
                 <div className="shrink-0 text-[11px] text-muted-foreground">{fromNow(n.at)}</div>
@@ -143,13 +161,21 @@ export function AppShell({ user, children }: { user: AuthUser; children: ReactNo
 
       <div className="lg:pl-72">
         <header className="sticky top-0 z-20 flex h-16 items-center gap-3 border-b bg-background/80 px-4 backdrop-blur-xl sm:px-8">
-          <Button variant="ghost" size="icon" className="lg:hidden" onClick={() => setOpen(true)} aria-label="Open navigation">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="lg:hidden"
+            onClick={() => setOpen(true)}
+            aria-label="Open navigation"
+          >
             <Menu className="h-5 w-5" />
           </Button>
           <div className="lg:hidden">
             <LogoLockup compact />
           </div>
-          <div className="hidden text-xs uppercase tracking-[0.24em] text-muted-foreground lg:block">{ROLE_LABEL[user.role]} portal</div>
+          <div className="hidden text-xs uppercase tracking-[0.24em] text-muted-foreground lg:block">
+            {ROLE_LABEL[user.role]} portal
+          </div>
           <div className="ml-auto flex items-center gap-2">
             {USE_DEMO_BACKEND && (
               <Badge variant="gold" className="hidden sm:inline-flex">

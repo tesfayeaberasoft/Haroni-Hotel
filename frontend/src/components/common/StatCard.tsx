@@ -21,6 +21,7 @@ export function StatCard({
   tone = "gold",
   delay = 0,
   highlight = false,
+  onClick,
 }: {
   label: string;
   value: ReactNode;
@@ -29,12 +30,31 @@ export function StatCard({
   tone?: Tone;
   delay?: number;
   highlight?: boolean;
+  onClick?: (() => void) | undefined;
 }) {
+  const interactive = onClick !== undefined;
   return (
     <div
+      role={interactive ? "button" : undefined}
+      tabIndex={interactive ? 0 : undefined}
+      aria-haspopup={interactive ? "dialog" : undefined}
+      aria-label={interactive ? `Open ${label.toLowerCase()} view` : undefined}
+      onClick={onClick}
+      onKeyDown={
+        onClick
+          ? (event) => {
+              if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault();
+                onClick();
+              }
+            }
+          : undefined
+      }
       className={cn(
         "group relative overflow-hidden rounded-xl border bg-card p-5 shadow-card card-hover animate-fade-up",
         highlight && "border-primary/35 bg-gold-soft",
+        interactive &&
+          "cursor-pointer transition-colors hover:border-primary/40 hover:bg-muted/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
       )}
       style={{ animationDelay: `${delay}ms` }}
     >

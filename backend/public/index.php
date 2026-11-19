@@ -85,7 +85,7 @@ try {
         Http::respond(['notifications' => (new NotificationService($pdo))->listFor((int) $user['id'])]);
     }
     if ($method === 'GET' && $path === '/api/backups') {
-        AuthService::requireRole($user, 'system_administrator');
+        AuthService::requireRole($user, 'system_administrator', 'finance_manager');
         $createdQuery = $pdo->query(
             "SELECT JSON_UNQUOTE(JSON_EXTRACT(a.details, '$.filename')) AS filename,
                     a.created_at, u.full_name AS created_by
@@ -117,7 +117,7 @@ try {
         Http::respond(['backups' => $backups]);
     }
     if ($method === 'POST' && $path === '/api/backups') {
-        AuthService::requireRole($user, 'system_administrator');
+        AuthService::requireRole($user, 'system_administrator', 'finance_manager');
         set_time_limit(0);
         $backup = DatabaseMaintenance::backup();
         AuditLogger::record($pdo, (int) $user['id'], 'database_backup_created', 'database_backup', null, [
@@ -137,7 +137,7 @@ try {
     }
     if (preg_match('#^/api/backups/(haroni-dcms-\d{8}-\d{6}-[a-f0-9]{8}\.sql)$#D', $path, $match) === 1
         && $method === 'GET') {
-        AuthService::requireRole($user, 'system_administrator');
+        AuthService::requireRole($user, 'system_administrator', 'finance_manager');
         $filename = $match[1];
         $backupPath = DatabaseMaintenance::backupPath($filename);
         $stream = fopen($backupPath, 'rb');
@@ -165,6 +165,22 @@ try {
         (new NotificationService($pdo))->markRead(Http::positiveId($match[1]), (int) $user['id']);
         Http::respond(['message' => 'Notification marked as read.']);
     }
+    if ($method === 'DELETE' && $path === '/api/notifications') {
+        (new NotificationService($pdo))->deleteAllFor((int) $user['id']);
+        Http::respond(['ok' => true]);
+    }
+    if (preg_match('#^/api/notifications/(\d+)$#D', $path, $match) === 1 && $method === 'DELETE') {
+        (new NotificationService($pdo))->deleteFor(Http::positiveId($match[1]), (int) $user['id']);
+        Http::respond(['ok' => true]);
+    }
+    if ($method === 'POST' && $path === '/api/notifications/clear') {
+        (new NotificationService($pdo))->deleteAllFor((int) $user['id']);
+        Http::respond(['ok' => true]);
+    }
+    if (preg_match('#^/api/notifications/(\d+)/delete$#D', $path, $match) === 1 && $method === 'POST') {
+        (new NotificationService($pdo))->deleteFor(Http::positiveId($match[1]), (int) $user['id']);
+        Http::respond(['ok' => true]);
+    }
     if ($method === 'POST' && $path === '/api/profile/password') {
         $body = Http::json();
         $auth->changePassword(
@@ -177,14 +193,14 @@ try {
 
     if ($method === 'GET' && $path === '/api/service-catalog') {
         Http::respond(['services' => (new ServiceCatalogService($pdo))->list(
-            $user['role'] === 'system_administrator'
+            in_array($user['role'], ['system_administrator', 'finance_manager'], true)
         )]);
     }
     if ($method === 'GET' && $path === '/api/service-categories') {
         AuthService::requireRole($user, 'system_administrator', 'cashier', 'finance_manager');
         Http::respond([
             'categories' => (new ServiceCatalogService($pdo))->categories(
-                $user['role'] === 'system_administrator'
+                in_array($user['role'], ['system_administrator', 'finance_manager'], true)
             ),
         ]);
     }
@@ -192,7 +208,7 @@ try {
         AuthService::requireRole($user, 'cashier', 'finance_manager');
         $term = Http::text($_GET['q'] ?? '', 'q', 100, true);
         $search = $pdo->prepare(
-            'SELECT ga.user_id, ga.full_name, u.phone, u.username
+            'SELECT ga.user_id, ga.full_name, u.phone, u.username, u.is_active, u.created_at
              FROM guest_accounts ga JOIN users u ON u.id = ga.user_id
              WHERE ga.full_name LIKE ? OR u.phone LIKE ? OR u.username LIKE ?
              ORDER BY ga.full_name LIMIT 50'
@@ -200,42 +216,66 @@ try {
         $search->execute(['%' . $term . '%', '%' . $term . '%', '%' . $term . '%']);
         $guests = [];
         foreach ($search->fetchAll() as $guest) {
-            $guests[] = array_merge(
-                [
-                    'guest_id' => (int) $guest['user_id'],
-                    'full_name' => $guest['full_name'],
-                    'phone' => $guest['phone'],
-                    'username' => $guest['username'],
-                ],
-                (new CreditAccountService($pdo))->summary((int) $guest['user_id'])
-            );
+            $identity = [
+                'guest_id' => (int) $guest['user_id'],
+                'full_name' => $guest['full_name'],
+                'phone' => $guest['phone'],
+                'username' => $guest['username'],
+                'is_active' => (bool) $guest['is_active'],
+                'created_at' => $guest['created_at'],
+            ];
+            $guests[] = $user['role'] === 'cashier'
+                ? $identity
+                : array_merge($identity, (new CreditAccountService($pdo))->summary((int) $guest['user_id']));
         }
         Http::respond(['guests' => $guests]);
     }
 
     if ($method === 'POST' && $path === '/api/users') {
-        AuthService::requireRole($user, 'system_administrator');
+        AuthService::requireRole($user, 'system_administrator', 'finance_manager');
         $id = (new UserManagementService($pdo))->create((int) $user['id'], Http::json());
         Http::respond(['id' => $id], 201);
     }
     if ($method === 'GET' && $path === '/api/users') {
-        AuthService::requireRole($user, 'system_administrator');
+        AuthService::requireRole($user, 'system_administrator', 'finance_manager');
         Http::respond(['users' => (new UserManagementService($pdo))->list()]);
     }
     if (preg_match('#^/api/users/(\d+)/profile$#D', $path, $match) === 1 && $method === 'POST') {
-        AuthService::requireRole($user, 'system_administrator');
+        AuthService::requireRole($user, 'system_administrator', 'finance_manager');
+        $body = Http::json();
+        if ($user['role'] === 'finance_manager'
+            && (($body['role'] ?? null) === 'system_administrator')) {
+            throw new ApiException(403, 'Finance Managers cannot assign the System Administrator role.');
+        }
+        if ($user['role'] === 'finance_manager') {
+            $targetId = Http::positiveId($match[1]);
+            $targetRole = $pdo->prepare('SELECT role FROM users WHERE id = ?');
+            $targetRole->execute([$targetId]);
+            $role = $targetRole->fetchColumn();
+            if ($role === 'system_administrator') {
+                throw new ApiException(403, 'Finance Managers cannot manage System Administrator accounts.');
+            }
+        }
         (new UserManagementService($pdo))->updateProfile(
             Http::positiveId($match[1]),
             (int) $user['id'],
-            Http::json()
+            $body
         );
         Http::respond(['message' => 'User profile updated.']);
     }
     if (preg_match('#^/api/users/(\d+)/status$#D', $path, $match) === 1 && $method === 'POST') {
-        AuthService::requireRole($user, 'system_administrator');
+        AuthService::requireRole($user, 'system_administrator', 'finance_manager');
         $body = Http::json();
         if (!is_bool($body['active'] ?? null)) {
             throw new ApiException(422, 'active must be a boolean.');
+        }
+        if ($user['role'] === 'finance_manager') {
+            $targetId = Http::positiveId($match[1]);
+            $targetRole = $pdo->prepare('SELECT role FROM users WHERE id = ?');
+            $targetRole->execute([$targetId]);
+            if ($targetRole->fetchColumn() === 'system_administrator') {
+                throw new ApiException(403, 'Finance Managers cannot manage System Administrator accounts.');
+            }
         }
         (new UserManagementService($pdo))->setActive(
             Http::positiveId($match[1]),
@@ -245,7 +285,15 @@ try {
         Http::respond(['message' => 'Account status updated.']);
     }
     if (preg_match('#^/api/users/(\d+)/password$#D', $path, $match) === 1 && $method === 'POST') {
-        AuthService::requireRole($user, 'system_administrator');
+        AuthService::requireRole($user, 'system_administrator', 'finance_manager');
+        if ($user['role'] === 'finance_manager') {
+            $targetId = Http::positiveId($match[1]);
+            $targetRole = $pdo->prepare('SELECT role FROM users WHERE id = ?');
+            $targetRole->execute([$targetId]);
+            if ($targetRole->fetchColumn() === 'system_administrator') {
+                throw new ApiException(403, 'Finance Managers cannot manage System Administrator accounts.');
+            }
+        }
         $temporaryPassword = (new UserManagementService($pdo))->resetPassword(
             Http::positiveId($match[1]),
             (int) $user['id']
@@ -264,7 +312,7 @@ try {
     }
 
     if ($method === 'POST' && $path === '/api/service-categories') {
-        AuthService::requireRole($user, 'system_administrator');
+        AuthService::requireRole($user, 'system_administrator', 'finance_manager');
         $body = Http::json();
         $id = (new ServiceCatalogService($pdo))->createCategory(
             Http::text($body['name'] ?? null, 'name', 100),
@@ -273,7 +321,7 @@ try {
         Http::respond(['id' => $id], 201);
     }
     if (preg_match('#^/api/service-categories/(\d+)$#D', $path, $match) === 1 && $method === 'POST') {
-        AuthService::requireRole($user, 'system_administrator');
+        AuthService::requireRole($user, 'system_administrator', 'finance_manager');
         (new ServiceCatalogService($pdo))->updateCategory(
             Http::positiveId($match[1]),
             Http::json(),
@@ -282,22 +330,23 @@ try {
         Http::respond(['message' => 'Service category updated.']);
     }
     if ($method === 'POST' && $path === '/api/service-catalog') {
-        AuthService::requireRole($user, 'system_administrator');
+        AuthService::requireRole($user, 'system_administrator', 'finance_manager');
         $body = Http::json();
         $created = (new ServiceCatalogService($pdo))->createService(
             Http::idValue($body['category_id'] ?? null, 'category_id'),
             Http::text($body['name'] ?? null, 'name', 160),
             Http::money($body['price'] ?? null, 'price'),
-            (int) $user['id']
+            (int) $user['id'],
+            $user['role'] === 'finance_manager'
         );
         Http::respond([
             'id' => $created['id'],
             'price_request_id' => $created['price_request_id'],
-            'status' => 'pending_finance_approval',
+            'status' => $created['price_request_id'] === null ? 'active' : 'pending_finance_approval',
         ], 201);
     }
     if (preg_match('#^/api/service-catalog/(\d+)/status$#D', $path, $match) === 1 && $method === 'POST') {
-        AuthService::requireRole($user, 'system_administrator');
+        AuthService::requireRole($user, 'system_administrator', 'finance_manager');
         $body = Http::json();
         if (!is_bool($body['active'] ?? null)) {
             throw new ApiException(422, 'active must be a boolean.');
@@ -305,12 +354,13 @@ try {
         (new ServiceCatalogService($pdo))->setAvailability(
             Http::positiveId($match[1]),
             $body['active'],
-            (int) $user['id']
+            (int) $user['id'],
+            $user['role'] === 'finance_manager'
         );
         Http::respond(['message' => 'Service availability updated.']);
     }
     if (preg_match('#^/api/service-catalog/(\d+)/profile$#D', $path, $match) === 1 && $method === 'POST') {
-        AuthService::requireRole($user, 'system_administrator');
+        AuthService::requireRole($user, 'system_administrator', 'finance_manager');
         (new ServiceCatalogService($pdo))->updateService(
             Http::positiveId($match[1]),
             Http::json(),
@@ -325,7 +375,7 @@ try {
         ]);
     }
     if ($method === 'POST' && preg_match('#^/api/service-catalog/(\d+)/price-requests$#D', $path, $match) === 1) {
-        AuthService::requireRole($user, 'system_administrator');
+        AuthService::requireRole($user, 'system_administrator', 'finance_manager');
         $body = Http::json();
         $id = (new ServiceCatalogService($pdo))->requestPriceChange(
             Http::positiveId($match[1]),
@@ -371,7 +421,7 @@ try {
         Http::respond((new CreditAccountService($pdo))->summary((int) $user['id']));
     }
     if (preg_match('#^/api/credit-account/(\d+)$#D', $path, $match) === 1 && $method === 'GET') {
-        AuthService::requireRole($user, 'cashier', 'finance_manager');
+        AuthService::requireRole($user, 'finance_manager');
         Http::respond((new CreditAccountService($pdo))->summary(Http::positiveId($match[1])));
     }
     if (preg_match('#^/api/guests/(\d+)/credit-limit$#D', $path, $match) === 1 && $method === 'POST') {
@@ -755,7 +805,7 @@ try {
         Http::respond(['audit_logs' => $query->fetchAll()]);
     }
     if ($method === 'POST' && $path === '/api/system-settings') {
-        AuthService::requireRole($user, 'system_administrator');
+        AuthService::requireRole($user, 'system_administrator', 'finance_manager');
         $body = Http::json();
         Http::requireFields($body, [
             'hotel_name',
@@ -812,7 +862,7 @@ try {
         Http::respond(['message' => 'System settings updated.']);
     }
     if ($method === 'POST' && $path === '/api/system-settings/confirmation-deadline') {
-        AuthService::requireRole($user, 'system_administrator');
+        AuthService::requireRole($user, 'system_administrator', 'finance_manager');
         $body = Http::json();
         $hours = filter_var($body['hours'] ?? null, FILTER_VALIDATE_INT);
         if ($hours === false) {
@@ -826,7 +876,7 @@ try {
         Http::respond(['settings' => (new SystemSettingsService($pdo))->list()]);
     }
     if ($method === 'POST' && $path === '/api/system-settings/hotel-profile') {
-        AuthService::requireRole($user, 'system_administrator');
+        AuthService::requireRole($user, 'system_administrator', 'finance_manager');
         $body = Http::json();
         (new SystemSettingsService($pdo))->hotelName(
             Http::text($body['hotel_name'] ?? null, 'hotel_name', 160),

@@ -48,15 +48,16 @@ final class ServiceCatalogService
         int $categoryId,
         string $name,
         string $price,
-        int $administratorId
+        int $administratorId,
+        bool $publishImmediately = false
     ): array {
         $name = trim($name);
         if ($name === '' || mb_strlen($name, 'UTF-8') > 160) {
             throw new ApiException(422, 'Service name must contain 1 to 160 characters.');
         }
         $query = $this->pdo->prepare(
-            'INSERT INTO service_catalog (category_id, name, current_price, created_by)
-             VALUES (?, ?, ?, ?)'
+            'INSERT INTO service_catalog (category_id, name, current_price, is_active, created_by)
+             VALUES (?, ?, ?, ?, ?)'
         );
         $this->pdo->beginTransaction();
         try {
@@ -67,8 +68,24 @@ final class ServiceCatalogService
             if ($category->fetchColumn() === false) {
                 throw new ApiException(422, 'Service category does not exist or is inactive.');
             }
-            $query->execute([$categoryId, $name, '0.00', $administratorId]);
+            $query->execute([
+                $categoryId,
+                $name,
+                $publishImmediately ? $price : '0.00',
+                $publishImmediately,
+                $administratorId,
+            ]);
             $id = (int) $this->pdo->lastInsertId();
+            if ($publishImmediately) {
+                AuditLogger::record($this->pdo, $administratorId, 'service_created', 'service_catalog', $id, [
+                    'category_id' => $categoryId,
+                    'name' => $name,
+                    'initial_price' => $price,
+                    'available' => true,
+                ]);
+                $this->pdo->commit();
+                return ['id' => $id, 'price_request_id' => null];
+            }
             $priceRequest = $this->pdo->prepare(
                 'INSERT INTO catalog_price_requests
                     (service_id, proposed_price, reason, requested_by)
@@ -391,12 +408,17 @@ final class ServiceCatalogService
         return array_slice($requests, 0, 500);
     }
 
-    public function setAvailability(int $serviceId, bool $active, int $administratorId): void
+    public function setAvailability(
+        int $serviceId,
+        bool $active,
+        int $administratorId,
+        bool $financeManager = false
+    ): void
     {
         $this->pdo->beginTransaction();
         try {
             $query = $this->pdo->prepare(
-                'SELECT s.id, c.is_active AS category_is_active
+                'SELECT s.id, s.current_price, c.is_active AS category_is_active
                  FROM service_catalog s
                  JOIN service_categories c ON c.id = s.category_id
                  WHERE s.id = ? FOR UPDATE'
@@ -410,12 +432,18 @@ final class ServiceCatalogService
                 if (!(bool) $service['category_is_active']) {
                     throw new ApiException(409, 'Activate the service category before activating this service.');
                 }
-                $approved = $this->pdo->prepare(
-                    'SELECT id FROM service_price_history WHERE service_id = ? LIMIT 1'
-                );
-                $approved->execute([$serviceId]);
-                if ($approved->fetchColumn() === false) {
-                    throw new ApiException(409, 'A Finance-approved catalog price is required before activating this service.');
+                if ($financeManager) {
+                    if (Money::minorUnits((string) $service['current_price']) <= 0) {
+                        throw new ApiException(409, 'Set a catalog price before activating this service.');
+                    }
+                } else {
+                    $approved = $this->pdo->prepare(
+                        'SELECT id FROM service_price_history WHERE service_id = ? LIMIT 1'
+                    );
+                    $approved->execute([$serviceId]);
+                    if ($approved->fetchColumn() === false) {
+                        throw new ApiException(409, 'A Finance-approved catalog price is required before activating this service.');
+                    }
                 }
             }
             $this->pdo->prepare('UPDATE service_catalog SET is_active = ? WHERE id = ?')
