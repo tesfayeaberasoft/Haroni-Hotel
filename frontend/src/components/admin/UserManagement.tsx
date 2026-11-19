@@ -28,7 +28,7 @@ import { USE_DEMO_BACKEND } from "@/services/config";
 import type { AccountStatus, StaffUser } from "@/types";
 
 type StaffRole = StaffUser["role"];
-const ROLES: StaffRole[] = ["admin", "cashier", "finance"];
+const ROLES: StaffRole[] = ["admin", "owner", "cashier", "finance"];
 
 export function UsersPage() {
   const { data: users } = useSuspenseQuery(q.users());
@@ -41,14 +41,19 @@ export function UsersPage() {
 
   const list = users.filter((u) => `${u.fullName} ${u.username} ${u.phone}`.toLowerCase().includes(search.toLowerCase()));
   const selectedUser = users.find((user) => user.id === selectedId) ?? null;
-  const canManageSelected = selectedUser?.role !== "admin" || session?.user.role === "admin";
+  const canManageUser = (user: StaffUser | null) =>
+    !user ||
+    !["admin", "owner"].includes(user.role) ||
+    session?.user.role === "admin" ||
+    session?.user.role === "owner";
+  const canManageSelected = canManageUser(selectedUser);
 
   return (
     <>
       <PageHeader
         eyebrow="Accounts"
         title="User management"
-        description="Manage Cashier, Finance Manager and Administrator staff accounts."
+        description="Manage Owner, Cashier, Finance Manager and Administrator staff accounts."
         actions={
           <Button onClick={() => setEditing("new")}>
             <Plus className="h-4 w-4" /> Add user
@@ -88,40 +93,42 @@ export function UsersPage() {
                 <TableCell className="text-muted-foreground">@{u.username}</TableCell>
                 <TableCell className="whitespace-nowrap">{u.phone}</TableCell>
                 <TableCell>
-                  <Badge variant={u.role === "admin" ? "info" : u.role === "finance" ? "gold" : "muted"}>{ROLE_LABEL[u.role]}</Badge>
+                  <Badge variant={u.role === "owner" ? "success" : u.role === "admin" ? "info" : u.role === "finance" ? "gold" : "muted"}>{ROLE_LABEL[u.role]}</Badge>
                 </TableCell>
                 <TableCell>
                   <AccountStatusBadge status={u.status} />
                 </TableCell>
                 <TableCell className="whitespace-nowrap text-sm text-muted-foreground">{dateTime(u.lastLoginAt)}</TableCell>
                 <TableCell>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon" aria-label={`Actions for ${u.fullName}`} onClick={(event) => event.stopPropagation()}>
-                        <MoreHorizontal className="h-4 w-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem onClick={() => setEditing(u)}>
-                        <Pencil className="h-4 w-4" /> Edit details & role
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => setResetting(u)}>
-                        <KeyRound className="h-4 w-4" /> Reset password
-                      </DropdownMenuItem>
-                      {u.id !== session?.user.id && (
-                        <>
-                          <DropdownMenuSeparator />
-                          {(["active", "inactive", ...(USE_DEMO_BACKEND ? ["suspended" as const] : [])] as AccountStatus[])
-                            .filter((s) => s !== u.status)
-                            .map((s) => (
-                              <DropdownMenuItem key={s} onClick={() => setStatus.mutate({ id: u.id, status: s })}>
-                                <Power className="h-4 w-4" /> {s === "active" ? "Activate" : s === "inactive" ? "Deactivate" : "Suspend"}
-                              </DropdownMenuItem>
-                            ))}
-                        </>
-                      )}
-                    </DropdownMenuContent>
-                  </DropdownMenu>
+                  {canManageUser(u) ? (
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon" aria-label={`Actions for ${u.fullName}`} onClick={(event) => event.stopPropagation()}>
+                          <MoreHorizontal className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem onClick={() => setEditing(u)}>
+                          <Pencil className="h-4 w-4" /> Edit details & role
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => setResetting(u)}>
+                          <KeyRound className="h-4 w-4" /> Reset password
+                        </DropdownMenuItem>
+                        {u.id !== session?.user.id && (
+                          <>
+                            <DropdownMenuSeparator />
+                            {(["active", "inactive", ...(USE_DEMO_BACKEND ? ["suspended" as const] : [])] as AccountStatus[])
+                              .filter((s) => s !== u.status)
+                              .map((s) => (
+                                <DropdownMenuItem key={s} onClick={() => setStatus.mutate({ id: u.id, status: s })}>
+                                  <Power className="h-4 w-4" /> {s === "active" ? "Activate" : s === "inactive" ? "Deactivate" : "Suspend"}
+                                </DropdownMenuItem>
+                              ))}
+                          </>
+                        )}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  ) : null}
                 </TableCell>
               </TableRow>
             ))}
@@ -216,12 +223,10 @@ export function UserDialog({
   const { session } = useAuth();
   const [f, setF] = useState<StaffInput>({ fullName: user?.fullName ?? "", username: user?.username ?? "", phone: user?.phone ?? "", role: user?.role ?? "cashier", password: "" });
   const availableRoles = session?.user.role === "finance"
-    ? ROLES.filter((role) => role !== "admin")
+    ? ROLES.filter((role) => role !== "admin" && role !== "owner")
     : user
       ? ROLES
-      : USE_DEMO_BACKEND
-        ? ROLES
-        : ROLES.filter((role) => role !== "admin");
+      : ROLES.filter((role) => role !== "admin");
   const save = useAction(
     () => (user ? usersService.update(user.id, { fullName: f.fullName, phone: f.phone, role: f.role }) : usersService.create(f)),
     { success: user ? "User updated." : "User created.", onSuccess: onClose },

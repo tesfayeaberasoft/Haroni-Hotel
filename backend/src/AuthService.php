@@ -204,7 +204,10 @@ final class AuthService
 
     public static function requireRole(array $user, string ...$roles): void
     {
-        if (!in_array($user['role'] ?? null, $roles, true)) {
+        $role = $user['role'] ?? null;
+        $ownerAccessRoles = ['system_administrator', 'cashier', 'finance_manager'];
+        if (!in_array($role, $roles, true)
+            && !($role === 'owner' && array_intersect($roles, $ownerAccessRoles) !== [])) {
             throw new ApiException(403, 'Your role is not permitted to perform this action.');
         }
     }

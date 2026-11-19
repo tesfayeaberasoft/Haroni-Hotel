@@ -1,5 +1,5 @@
 import { useSuspenseQuery } from "@tanstack/react-query";
-import { Pencil, XCircle } from "lucide-react";
+import { KeyRound, MessageSquareText, Pencil, XCircle } from "lucide-react";
 import { Suspense, useState } from "react";
 import { GuestPicker } from "@/components/common/GuestPicker";
 import { SectionTitle } from "@/components/common/PageHeader";
@@ -26,6 +26,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Select,
@@ -255,6 +257,111 @@ export function CashierTransactionDetailDialog({
   );
 }
 
+export function InHotelConfirm({
+  tx,
+  compact = false,
+}: {
+  tx: CreditTransaction;
+  compact?: boolean;
+}) {
+  const [method, setMethod] = useState<"pin" | "otp">("pin");
+  const [code, setCode] = useState("");
+  const [otpInfo, setOtpInfo] = useState<string | null>(null);
+  const sendOtp = useAction(() => transactionsService.sendOtp(tx.id), {
+    success: (r) => `Code sent to ${r.sentTo}.`,
+    onSuccess: (r) =>
+      setOtpInfo(
+        r.demoCode ? `Sent to ${r.sentTo}. Demo code: ${r.demoCode}` : `Sent to ${r.sentTo}.`,
+      ),
+  });
+  const confirm = useAction(() => transactionsService.confirmInHotel(tx.id, method, code.trim()), {
+    success: "Guest confirmation recorded.",
+    onSuccess: () => setCode(""),
+  });
+
+  if (tx.status !== "pending_guest") return null;
+
+  return (
+    <Panel
+      className={
+        compact
+          ? "min-w-0 border-primary/30 bg-gold-soft p-3 sm:p-4"
+          : "min-w-0 border-primary/30 bg-gold-soft"
+      }
+    >
+      <SectionTitle title="Confirm in hotel" compact={compact} />
+      <p className="mb-3 text-sm text-muted-foreground">
+        {USE_DEMO_BACKEND
+          ? "If the guest is at the desk, confirm with their PIN. SMS is optional."
+          : "Ask the guest to enter their confirmation PIN. SMS is not required."}
+      </p>
+      {USE_DEMO_BACKEND && (
+        <Tabs
+          value={method}
+          onValueChange={(value) => {
+            setMethod(value as "pin" | "otp");
+            setCode("");
+          }}
+          className="mb-3 min-w-0"
+        >
+          <TabsList className="grid h-auto w-full min-w-0 grid-cols-2">
+            <TabsTrigger value="pin" className="min-w-0 gap-1 px-2">
+              <KeyRound className="h-3.5 w-3.5 shrink-0" /> Guest PIN
+            </TabsTrigger>
+            <TabsTrigger value="otp" className="min-w-0 gap-1 px-2">
+              <MessageSquareText className="h-3.5 w-3.5 shrink-0" /> SMS code
+            </TabsTrigger>
+          </TabsList>
+        </Tabs>
+      )}
+      <form
+        className="min-w-0 space-y-3"
+        onSubmit={(event) => {
+          event.preventDefault();
+          if (code.trim()) confirm.mutate(undefined);
+        }}
+      >
+        {method === "otp" && (
+          <div className="min-w-0 space-y-2">
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full"
+              onClick={() => sendOtp.mutate(undefined)}
+              disabled={sendOtp.isPending}
+            >
+              {sendOtp.isPending && <Spinner className="h-4 w-4 text-current" />}
+              {otpInfo ? "Send a new code" : "Send code to guest's phone"}
+            </Button>
+            {otpInfo && <p className="break-words text-xs text-info">{otpInfo}</p>}
+          </div>
+        )}
+        <div className="min-w-0 space-y-2">
+          <Label htmlFor={`confirm-code-${tx.id}`}>
+            {method === "pin" ? "Guest enters their PIN" : "One-time code"}
+          </Label>
+          <Input
+            id={`confirm-code-${tx.id}`}
+            type={method === "pin" ? "password" : "text"}
+            inputMode="numeric"
+            autoComplete="off"
+            required
+            value={code}
+            onChange={(event) =>
+              setCode(event.target.value.replace(/\D/g, "").slice(0, method === "pin" ? 12 : 6))
+            }
+            className="min-w-0 bg-background text-center text-base tracking-[0.25em] sm:text-lg sm:tracking-[0.4em]"
+          />
+        </div>
+        <Button type="submit" className="w-full" disabled={!code.trim() || confirm.isPending}>
+          {confirm.isPending && <Spinner className="h-4 w-4 text-current" />}
+          Confirm for guest
+        </Button>
+      </form>
+    </Panel>
+  );
+}
+
 export function CashierTransactionActions({
   tx,
   compact = false,
@@ -378,7 +485,14 @@ function CashierTransactionDetailBody({
       </DialogHeader>
       <TransactionDetail
         tx={data.transaction}
-        aside={<CashierTransactionActions tx={data.transaction} compact nested={nested} />}
+        aside={
+          <>
+            {data.transaction.status === "pending_guest" && (
+              <InHotelConfirm tx={data.transaction} compact />
+            )}
+            <CashierTransactionActions tx={data.transaction} compact nested={nested} />
+          </>
+        }
         showCreditAmounts={false}
         compact
       />

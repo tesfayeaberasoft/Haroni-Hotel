@@ -108,7 +108,7 @@ final class NotificationService
         $query = $pdo->prepare(
             "INSERT INTO notifications (user_id, related_transaction_id, notification_type, event_key, message)
              SELECT id, ?, ?, ?, ?
-             FROM users WHERE role = 'finance_manager' AND is_active = TRUE
+             FROM users WHERE role IN ('finance_manager', 'owner') AND is_active = TRUE
              ON DUPLICATE KEY UPDATE message = VALUES(message)"
         );
         $query->execute([

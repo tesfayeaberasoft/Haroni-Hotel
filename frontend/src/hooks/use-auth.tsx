@@ -9,6 +9,7 @@ import { toast } from "sonner";
 
 export const ROLE_HOME: Record<Role, "/" | "/cashier" | "/finance" | "/guest"> = {
   admin: "/",
+  owner: "/finance",
   cashier: "/cashier",
   finance: "/finance",
   guest: "/guest",
@@ -16,6 +17,7 @@ export const ROLE_HOME: Record<Role, "/" | "/cashier" | "/finance" | "/guest"> =
 
 export const ROLE_LABEL: Record<Role, string> = {
   admin: "System Administrator",
+  owner: "Hotel Owner",
   cashier: "Cashier",
   finance: "Finance Manager",
   guest: "Guest",

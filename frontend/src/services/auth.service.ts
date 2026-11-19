@@ -7,7 +7,7 @@ type PhpUser = {
   id: number | string;
   username: string;
   full_name: string;
-  role: "system_administrator" | "cashier" | "finance_manager" | "guest";
+  role: "system_administrator" | "owner" | "cashier" | "finance_manager" | "guest";
   phone?: string | null;
   is_active?: boolean;
   must_change_password?: boolean;
@@ -17,6 +17,7 @@ type PhpUser = {
 function mapUser(user: PhpUser): AuthUser {
   const roles: Record<PhpUser["role"], Role> = {
     system_administrator: "admin",
+    owner: "owner",
     cashier: "cashier",
     finance_manager: "finance",
     guest: "guest",

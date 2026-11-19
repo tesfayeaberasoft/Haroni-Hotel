@@ -5,6 +5,14 @@ const KEY = "haroni-dcms-demo-db";
 let state: DemoState | null = null;
 let storageListenerRegistered = false;
 
+function addSeedOwner() {
+  if (!state || state.staff.some((user) => user.role === "owner")) return;
+  const owner = buildSeed().staff.find((user) => user.role === "owner");
+  if (!owner) return;
+  state.staff.push(owner);
+  persist();
+}
+
 function syncFromOtherTab(event: StorageEvent) {
   if (event.key !== KEY && event.key !== null) return;
   if (event.newValue === null) {
@@ -24,7 +32,10 @@ export function db(): DemoState {
     window.addEventListener("storage", syncFromOtherTab);
     storageListenerRegistered = true;
   }
-  if (state) return state;
+  if (state) {
+    addSeedOwner();
+    return state;
+  }
   if (typeof window !== "undefined") {
     try {
       const raw = window.localStorage.getItem(KEY);
@@ -32,6 +43,7 @@ export function db(): DemoState {
         const parsed = JSON.parse(raw) as DemoState;
         if (parsed.version === DEMO_VERSION) {
           state = parsed;
+          addSeedOwner();
           return state;
         }
       }

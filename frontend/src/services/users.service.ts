@@ -27,7 +27,8 @@ function mapStaff(value: unknown): StaffUser {
   };
 }
 
-const apiRole = (role: StaffUser["role"]) => role === "admin" ? "system_administrator" : role === "finance" ? "finance_manager" : role;
+const apiRole = (role: StaffUser["role"]) =>
+  role === "admin" ? "system_administrator" : role === "finance" ? "finance_manager" : role;
 
 export const usersService = {
   list: async () => {

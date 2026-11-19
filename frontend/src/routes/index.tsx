@@ -218,7 +218,7 @@ function Landing() {
                   </div>
                   <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
                     Guest: abebe / guest123 · Cashier: cashier / cashier123 · Finance: finance /
-                    finance123 · Admin: admin / admin123
+                    finance123 · Owner: owner / owner123 · Admin: admin / admin123
                   </p>
                 </div>
               )}

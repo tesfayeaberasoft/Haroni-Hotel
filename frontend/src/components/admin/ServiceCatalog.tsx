@@ -33,7 +33,7 @@ const CATS: { id: ServiceCategory; label: string }[] = [
 
 export function ServicesPage({ embedded = false }: { embedded?: boolean }) {
   const { session } = useAuth();
-  const isFinanceManager = session?.user.role === "finance";
+  const isFinanceManager = session?.user.role === "finance" || session?.user.role === "owner";
   const { data } = useSuspenseQuery(q.services());
   const [editing, setEditing] = useState<HotelService | "new" | null>(null);
   const [search, setSearch] = useState("");

@@ -44,12 +44,12 @@ final class CreditTransactionService
         }
     }
 
-    public function submit(int $transactionId, int $cashierId): array
+    public function submit(int $transactionId, int $cashierId, bool $canManageAll = false): array
     {
         $this->pdo->beginTransaction();
         try {
             $transaction = $this->lockTransaction($transactionId);
-            if ((int) $transaction['cashier_id'] !== $cashierId) {
+            if (!$canManageAll && (int) $transaction['cashier_id'] !== $cashierId) {
                 throw new ApiException(403, 'Only the creating Cashier can submit this transaction.');
             }
             if ($transaction['status'] !== 'draft') {
@@ -106,7 +106,8 @@ final class CreditTransactionService
         int $transactionId,
         int $cashierId,
         array $items,
-        string $consumptionDate
+        string $consumptionDate,
+        bool $canManageAll = false
     ): array {
         $this->validateItems($items);
         $this->validateSpecialPriceSchema($items);
@@ -114,7 +115,7 @@ final class CreditTransactionService
         $this->pdo->beginTransaction();
         try {
             $transaction = $this->lockTransaction($transactionId);
-            if ((int) $transaction['cashier_id'] !== $cashierId) {
+            if (!$canManageAll && (int) $transaction['cashier_id'] !== $cashierId) {
                 throw new ApiException(403, 'Only the creating Cashier can edit this transaction.');
             }
             if ($transaction['status'] !== 'draft') {
@@ -148,16 +149,36 @@ final class CreditTransactionService
 
     public function confirmInPerson(int $transactionId, int $guestId, int $cashierId, string $pin): array
     {
-        if (!preg_match('/^\d{6,12}$/D', $pin)) {
-            throw new ApiException(422, 'The guest confirmation PIN is invalid.');
+        if (trim($pin) === '') {
+            throw new ApiException(422, 'Enter the guest confirmation PIN.');
         }
-        $this->checkPinRateLimit($guestId);
+        if (!preg_match('/^\d{6,12}$/D', $pin)) {
+            throw new ApiException(422, 'The guest confirmation PIN must contain 6 to 12 digits.');
+        }
+        $transactionQuery = $this->pdo->prepare(
+            'SELECT guest_id, status FROM credit_transactions WHERE id = ?'
+        );
+        $transactionQuery->execute([$transactionId]);
+        $transaction = $transactionQuery->fetch();
+        if ($transaction === false || (int) $transaction['guest_id'] !== $guestId) {
+            throw new ApiException(404, 'Transaction not found.');
+        }
+        if ($transaction['status'] !== 'pending_guest_confirmation') {
+            throw new ApiException(409, 'This transaction is no longer awaiting guest confirmation.');
+        }
         $query = $this->pdo->prepare('SELECT pin_hash FROM guest_confirmation_pins WHERE guest_id = ?');
         $query->execute([$guestId]);
         $hash = $query->fetchColumn();
-        if (!is_string($hash) || !password_verify($pin, $hash)) {
+        if (!is_string($hash)) {
+            throw new ApiException(
+                409,
+                'This guest has not set a confirmation PIN. Ask them to set one from Profile before confirming.'
+            );
+        }
+        $this->checkPinRateLimit($guestId);
+        if (!password_verify($pin, $hash)) {
             $this->recordPinFailure($guestId);
-            throw new ApiException(403, 'Guest confirmation PIN is invalid.');
+            throw new ApiException(403, 'The guest confirmation PIN is incorrect. Check it and try again.');
         }
         $this->pdo->prepare('DELETE FROM confirmation_pin_attempts WHERE guest_id = ? AND ip_key = ?')
             ->execute([$guestId, hash('sha256', $_SERVER['REMOTE_ADDR'] ?? 'unknown')]);
@@ -197,7 +218,8 @@ final class CreditTransactionService
         int $cashierId,
         array $items,
         ?string $consumptionDate = null,
-        string $note = ''
+        string $note = '',
+        bool $canManageAll = false
     ): array {
         $this->validateItems($items);
         $this->validateSpecialPriceSchema($items);
@@ -211,7 +233,7 @@ final class CreditTransactionService
         $this->pdo->beginTransaction();
         try {
             $transaction = $this->lockTransaction($transactionId);
-            if ((int) $transaction['cashier_id'] !== $cashierId) {
+            if (!$canManageAll && (int) $transaction['cashier_id'] !== $cashierId) {
                 throw new ApiException(403, 'Only the creating Cashier can correct this transaction.');
             }
             if (!in_array($transaction['status'], ['disputed', 'pending_guest_confirmation', 'pending_price_approval'], true)) {
@@ -551,7 +573,7 @@ final class CreditTransactionService
         if ($user['role'] === 'cashier' && (int) $transaction['cashier_id'] !== (int) $user['id']) {
             throw new ApiException(404, 'Transaction not found.');
         }
-        if (!in_array($user['role'], ['guest', 'cashier', 'finance_manager'], true)) {
+        if (!in_array($user['role'], ['guest', 'cashier', 'finance_manager', 'owner'], true)) {
             throw new ApiException(403, 'Your role cannot view transaction details.');
         }
         $items = $this->pdo->prepare(
@@ -578,7 +600,7 @@ final class CreditTransactionService
         } elseif ($user['role'] === 'cashier') {
             $where[] = 'ct.cashier_id = ?';
             $parameters[] = (int) $user['id'];
-        } elseif ($user['role'] !== 'finance_manager') {
+        } elseif (!in_array($user['role'], ['finance_manager', 'owner'], true)) {
             throw new ApiException(403, 'Your role cannot view transactions.');
         }
         $allowedStatuses = [

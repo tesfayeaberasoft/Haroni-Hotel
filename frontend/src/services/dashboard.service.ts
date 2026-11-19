@@ -58,8 +58,10 @@ export interface GuestDashboard {
   notifications: Notification[];
 }
 
-async function phpDashboard() {
-  const response = await api.get<{ dashboard: Record<string, unknown> }>("/dashboard");
+async function phpDashboard(view?: "cashier" | "finance") {
+  const response = await api.get<{ dashboard: Record<string, unknown> }>(
+    view ? `/dashboard?view=${view}` : "/dashboard",
+  );
   return phpRow(response.dashboard);
 }
 
@@ -95,10 +97,10 @@ export const dashboardService = {
   },
   cashier: async () => {
     if (USE_DEMO_BACKEND) return api.get<CashierDashboard>("/dashboard/cashier");
-    const row = await phpDashboard();
+    const row = await phpDashboard("cashier");
     return {
       totalRecorded: phpNumber(row.total_transactions),
-      recordedByMe: phpNumber(row.total_transactions),
+      recordedByMe: phpNumber(row.recorded_by_me ?? row.total_transactions),
       pendingGuest: phpNumber(row.pending_guest_confirmations),
       disputed: phpNumber(row.disputed),
       awaitingFinance: phpNumber(row.awaiting_finance),
@@ -110,7 +112,7 @@ export const dashboardService = {
   },
   finance: async () => {
     if (USE_DEMO_BACKEND) return api.get<FinanceDashboard>("/dashboard/finance");
-    const row = await phpDashboard();
+    const row = await phpDashboard("finance");
     const [priceRequests, historical, reconciliation, payments] = await Promise.all([
       api.get<{ requests: unknown[] }>("/service-price-requests"),
       api.get<{ opening_balances: unknown[] }>("/historical-debts"),

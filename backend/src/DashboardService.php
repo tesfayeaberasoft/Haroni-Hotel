@@ -11,8 +11,15 @@ final class DashboardService
     {
     }
 
-    public function forUser(array $user): array
+    public function forUser(array $user, ?string $view = null): array
     {
+        if ($user['role'] === 'owner') {
+            return match ($view) {
+                null, 'finance' => $this->finance(),
+                'cashier' => $this->cashier(null, (int) $user['id']),
+                default => throw new ApiException(422, 'Unknown dashboard view.'),
+            };
+        }
         return match ($user['role']) {
             'system_administrator' => $this->administrator(),
             'cashier' => $this->cashier((int) $user['id']),
@@ -84,8 +91,9 @@ final class DashboardService
         return ['dashboard' => $summary];
     }
 
-    private function cashier(int $cashierId): array
+    private function cashier(?int $cashierId, ?int $recordedById = null): array
     {
+        $filter = $cashierId === null ? '' : ' WHERE cashier_id = ?';
         $query = $this->pdo->prepare(
             "SELECT COUNT(*) AS total_transactions,
                 COALESCE(SUM(status = 'pending_guest_confirmation'), 0) AS pending_guest_confirmations,
@@ -98,17 +106,23 @@ final class DashboardService
                 COALESCE(SUM(status = 'draft'), 0) AS drafts,
                 COALESCE(SUM(status = 'cancelled'), 0) AS cancelled,
                 COALESCE(SUM(status = 'expired'), 0) AS expired
-             FROM credit_transactions WHERE cashier_id = ?"
+             FROM credit_transactions" . $filter
         );
-        $query->execute([$cashierId]);
+        $query->execute($cashierId === null ? [] : [$cashierId]);
         $summary = $query->fetch();
+        if ($recordedById !== null) {
+            $recorded = $this->pdo->prepare('SELECT COUNT(*) FROM credit_transactions WHERE cashier_id = ?');
+            $recorded->execute([$recordedById]);
+            $summary['recorded_by_me'] = (int) $recorded->fetchColumn();
+        }
         $recent = $this->pdo->prepare(
             'SELECT ct.id, ct.consumption_date, ct.status, ct.total_amount, ct.created_at,
                     ga.user_id AS guest_id, ga.full_name AS guest_name
-             FROM credit_transactions ct JOIN guest_accounts ga ON ga.user_id = ct.guest_id
-             WHERE ct.cashier_id = ? ORDER BY ct.created_at DESC LIMIT 20'
+             FROM credit_transactions ct JOIN guest_accounts ga ON ga.user_id = ct.guest_id' .
+                ($cashierId === null ? '' : ' WHERE ct.cashier_id = ?') .
+                ' ORDER BY ct.created_at DESC LIMIT 20'
         );
-        $recent->execute([$cashierId]);
+        $recent->execute($cashierId === null ? [] : [$cashierId]);
         $summary['recent_transactions'] = $recent->fetchAll();
         return ['dashboard' => $summary];
     }

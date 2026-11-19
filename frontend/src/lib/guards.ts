@@ -10,6 +10,10 @@ import type { Role } from "@/types";
 export function requireRole(role: Role) {
   const session = readSession();
   if (!session) throw redirect({ to: "/" });
-  if (session.user.role !== role) throw redirect({ to: ROLE_HOME[session.user.role] });
+  const isOwnerPortal =
+    session.user.role === "owner" && (role === "finance" || role === "cashier");
+  if (session.user.role !== role && !isOwnerPortal) {
+    throw redirect({ to: ROLE_HOME[session.user.role] });
+  }
   return { session };
 }

@@ -149,7 +149,7 @@ final class PaymentService
                  ORDER BY p.payment_date DESC LIMIT 500'
             );
             $query->execute([(int) $user['id']]);
-        } elseif ($user['role'] === 'finance_manager') {
+        } elseif (in_array($user['role'], ['finance_manager', 'owner'], true)) {
             $query = $this->pdo->query(
                 'SELECT p.id, p.guest_id, ga.full_name, p.amount, p.method, p.reference_number,
                         p.payment_date, p.status, p.receipt_number, p.previous_balance, p.remaining_balance,
@@ -193,7 +193,7 @@ final class PaymentService
         if ($user['role'] === 'guest' && (int) $payment['guest_id'] !== (int) $user['id']) {
             throw new ApiException(404, 'Verified payment receipt not found.');
         }
-        if (!in_array($user['role'], ['guest', 'finance_manager'], true)) {
+        if (!in_array($user['role'], ['guest', 'finance_manager', 'owner'], true)) {
             throw new ApiException(403, 'Your role cannot access payment receipts.');
         }
         return $payment;

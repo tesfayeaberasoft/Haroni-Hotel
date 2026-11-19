@@ -8,7 +8,7 @@ CREATE TABLE users (
     username VARCHAR(80) NOT NULL,
     full_name VARCHAR(180) NOT NULL,
     password_hash VARCHAR(255) NOT NULL,
-    role ENUM('system_administrator','cashier','finance_manager','guest') NOT NULL,
+    role ENUM('system_administrator','owner','cashier','finance_manager','guest') NOT NULL,
     phone VARCHAR(32) NULL,
     must_change_password BOOLEAN NOT NULL DEFAULT FALSE,
     auth_version INT UNSIGNED NOT NULL DEFAULT 0,

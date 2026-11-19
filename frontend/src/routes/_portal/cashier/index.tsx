@@ -27,6 +27,7 @@ import {
   CASHIER_NEW_MODAL_SCROLL_CLASS,
 } from "@/components/cashier/modal-styles";
 import { PageHeader, SectionTitle } from "@/components/common/PageHeader";
+import { PaginationControls } from "@/components/common/PaginationControls";
 import { StatCard } from "@/components/common/StatCard";
 import { TransactionsTable } from "@/components/transactions/TransactionParts";
 import { Button } from "@/components/ui/button";
@@ -37,6 +38,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { usePaginatedItems } from "@/hooks/use-pagination";
 import { q } from "@/lib/queries";
 import { pageHead } from "@/lib/seo";
 import type { TransactionStatus } from "@/types";
@@ -50,6 +52,7 @@ export const Route = createFileRoute("/_portal/cashier/")({
 
 function CashierDashboard() {
   const { data: d } = useSuspenseQuery(q.cashierDashboard());
+  const recentTransactionsPagination = usePaginatedItems(d.recent, "", 10);
   const [workflow, setWorkflow] = useState<"new" | "pending" | "history" | null>(null);
   const [selectedTransactionId, setSelectedTransactionId] = useState<string | null>(null);
   const [pendingTab, setPendingTab] = useState<CashierPendingTab>("all");
@@ -173,7 +176,11 @@ function CashierDashboard() {
             </Button>
           }
         />
-        <TransactionsTable rows={d.recent} onRowClick={(tx) => setSelectedTransactionId(tx.id)} />
+        <TransactionsTable
+          rows={recentTransactionsPagination.currentItems}
+          onRowClick={(tx) => setSelectedTransactionId(tx.id)}
+        />
+        {d.recent.length > 10 && <PaginationControls {...recentTransactionsPagination} />}
       </div>
       <Dialog open={workflow !== null} onOpenChange={(open) => !open && setWorkflow(null)}>
         <DialogContent

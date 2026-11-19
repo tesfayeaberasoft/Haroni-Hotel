@@ -160,6 +160,7 @@ export function phpDate(value: unknown): string {
 export function mapPhpRole(role: unknown): StaffUser["role"] | "guest" {
   switch (role) {
     case "system_administrator": return "admin";
+    case "owner": return "owner";
     case "cashier": return "cashier";
     case "finance_manager": return "finance";
     case "guest": return "guest";

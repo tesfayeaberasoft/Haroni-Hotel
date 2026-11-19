@@ -1,7 +1,7 @@
 // Shared domain types for the Haroni Hotel DCMS frontend.
 // These mirror the JSON shapes the PHP backend returns (see src/services/API_CONTRACT.md).
 
-export type Role = "admin" | "cashier" | "finance" | "guest";
+export type Role = "admin" | "owner" | "cashier" | "finance" | "guest";
 export type AccountStatus = "active" | "inactive" | "suspended";
 
 export interface AuthUser {

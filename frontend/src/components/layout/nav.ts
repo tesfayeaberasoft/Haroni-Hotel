@@ -22,35 +22,51 @@ export interface NavGroup {
   items: NavItem[];
 }
 
+const CASHIER_NAV: NavGroup[] = [
+  {
+    label: "Cashier",
+    items: [{ to: "/cashier", label: "Dashboard", icon: LayoutDashboard, exact: true }],
+  },
+  {
+    label: "Credit desk",
+    items: [{ to: "/cashier/guests", label: "Guest Search", icon: Search }],
+  },
+];
+
+const FINANCE_NAV: NavGroup[] = [
+  {
+    label: "Finance",
+    items: [{ to: "/finance", label: "Dashboard", icon: Gauge, exact: true }],
+  },
+  {
+    label: "Accounts",
+    items: [
+      { to: "/finance/guests", label: "Accounts", icon: Users },
+      { to: "/finance/historical", label: "Historical Debt", icon: Landmark },
+    ],
+  },
+  {
+    label: "Reports",
+    items: [{ to: "/finance/reports", label: "Financial Reports", icon: BarChart3 }],
+  },
+];
+
 export const NAV: Record<Role, NavGroup[]> = {
   admin: [],
-  cashier: [
+  owner: [
     {
-      label: "Overview",
-      items: [{ to: "/cashier", label: "Dashboard", icon: LayoutDashboard, exact: true }],
+      label: "Finance",
+      items: [{ to: "/finance", label: "Finance Dashboard", icon: Gauge, exact: true }],
     },
+    ...FINANCE_NAV.slice(1),
     {
-      label: "Credit desk",
-      items: [{ to: "/cashier/guests", label: "Guest Search", icon: Search }],
+      label: "Cashier",
+      items: [{ to: "/cashier", label: "Cashier Dashboard", icon: LayoutDashboard, exact: true }],
     },
+    ...CASHIER_NAV.slice(1),
   ],
-  finance: [
-    {
-      label: "Overview",
-      items: [{ to: "/finance", label: "Dashboard", icon: Gauge, exact: true }],
-    },
-    {
-      label: "Accounts",
-      items: [
-        { to: "/finance/guests", label: "Accounts", icon: Users },
-        { to: "/finance/historical", label: "Historical Debt", icon: Landmark },
-      ],
-    },
-    {
-      label: "Reports",
-      items: [{ to: "/finance/reports", label: "Financial Reports", icon: BarChart3 }],
-    },
-  ],
+  cashier: CASHIER_NAV,
+  finance: FINANCE_NAV,
   guest: [
     {
       label: "My account",

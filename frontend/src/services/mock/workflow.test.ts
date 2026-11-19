@@ -59,11 +59,113 @@ describe("credit transaction workflow (SRS 2.1, 2.3)", () => {
     await expect(demoRequest("POST", `/transactions/${tx.id}/confirm`)).rejects.toThrow();
   });
 
-  it("only the Finance Manager can approve transactions", async () => {
+  it("confirms a pending guest with a PIN without sending an OTP and blocks duplicates", async () => {
     await loginAs("cashier", "cashier123");
-    await expect(demoRequest("POST", "/transactions/t-1046/approve")).rejects.toThrow(/permission/);
+    const tx = await demoRequest<CreditTransaction>("POST", "/transactions", {
+      guestId: "g-01",
+      items: [{ serviceId: "s-02", quantity: 1 }],
+    });
+    const guestPin = db().guests.find((guest) => guest.id === "g-01")?.pin;
+    expect(guestPin).toBeTruthy();
+
+    const confirmed = await demoRequest<CreditTransaction>(
+      "POST",
+      `/transactions/${tx.id}/confirm-in-hotel`,
+      { method: "pin", code: guestPin },
+    );
+    expect(confirmed.status).toBe("pending_finance");
+    expect(confirmed.confirmation?.method).toBe("pin");
+    expect(confirmed.confirmation?.assistedBy).toBe("Dawit Bekele");
+    await expect(
+      demoRequest("POST", `/transactions/${tx.id}/confirm-in-hotel`, {
+        method: "pin",
+        code: guestPin,
+      }),
+    ).rejects.toThrow(/not awaiting confirmation/i);
+  });
+
+  it("returns clear errors for a missing PIN or a guest without a configured PIN", async () => {
+    await loginAs("cashier", "cashier123");
+    const tx = await demoRequest<CreditTransaction>("POST", "/transactions", {
+      guestId: "g-01",
+      items: [{ serviceId: "s-02", quantity: 1 }],
+    });
+    await expect(
+      demoRequest("POST", `/transactions/${tx.id}/confirm-in-hotel`, {
+        method: "pin",
+        code: "",
+      }),
+    ).rejects.toThrow(/enter the guest confirmation PIN/i);
+
+    const guest = db().guests.find((item) => item.id === "g-01");
+    expect(guest).toBeDefined();
+    guest!.pin = "";
+    await expect(
+      demoRequest("POST", `/transactions/${tx.id}/confirm-in-hotel`, {
+        method: "pin",
+        code: "1234",
+      }),
+    ).rejects.toThrow(/has not set a confirmation PIN/i);
+  });
+
+  it("allows Finance Managers and Owners, but not Cashiers or Administrators, to approve", async () => {
+    const tx = db().transactions.find((transaction) => transaction.status === "pending_finance");
+    expect(tx).toBeDefined();
+    await loginAs("cashier", "cashier123");
+    await expect(demoRequest("POST", `/transactions/${tx!.id}/approve`)).rejects.toThrow(
+      /permission/,
+    );
     await loginAs("admin", "admin123");
-    await expect(demoRequest("POST", "/transactions/t-1046/approve")).rejects.toThrow(/permission/);
+    await expect(demoRequest("POST", `/transactions/${tx!.id}/approve`)).rejects.toThrow(
+      /permission/,
+    );
+    await loginAs("owner", "owner123");
+    const approved = await demoRequest<CreditTransaction>(
+      "POST",
+      `/transactions/${tx!.id}/approve`,
+    );
+    expect(approved.status).toBe("approved");
+    expect(approved.history.at(-1)?.by).toBe("Hotel Owner");
+  });
+
+  it("lets the Owner use cashier workflows and manage owner accounts", async () => {
+    const tx = db().transactions[0];
+    expect(tx).toBeDefined();
+    tx!.status = "draft";
+    tx!.createdBy = "Another Cashier";
+
+    await loginAs("owner", "owner123");
+    const cashierDashboard = await demoRequest<{ totalRecorded: number }>(
+      "GET",
+      "/dashboard/cashier",
+    );
+    expect(cashierDashboard.totalRecorded).toBe(db().transactions.length);
+
+    const updated = await demoRequest<CreditTransaction>("POST", `/transactions/${tx!.id}/draft`, {
+      items: [{ serviceId: "s-02", quantity: 1 }],
+    });
+    expect(updated.status).toBe("draft");
+    expect(updated.history.at(-1)?.by).toBe("Hotel Owner");
+
+    const created = await demoRequest<{ role: string }>("POST", "/users", {
+      fullName: "Additional Owner",
+      username: "additional-owner",
+      password: "ownerpass123",
+      role: "owner",
+    });
+    expect(created.role).toBe("owner");
+  });
+
+  it("prevents Finance Managers from creating Owner accounts", async () => {
+    await loginAs("finance", "finance123");
+    await expect(
+      demoRequest("POST", "/users", {
+        fullName: "Unauthorized Owner",
+        username: "unauthorized-owner",
+        password: "ownerpass123",
+        role: "owner",
+      }),
+    ).rejects.toThrow(/Only Owners or System Administrators/i);
   });
 
   it("transactions over available credit need an exceptional approval with a reason", async () => {

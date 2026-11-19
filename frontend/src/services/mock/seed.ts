@@ -62,6 +62,7 @@ export function buildSeed(now = Date.now()): DemoState {
 
   const staff: DemoStaff[] = [
     { id: "u-admin", fullName: "Selam Tesfaye", username: "admin", password: "admin123", phone: "+251 911 200 300", role: "admin", status: "active", createdAt: iso(400 * DAY) },
+    { id: "u-owner", fullName: "Hotel Owner", username: "owner", password: "owner123", phone: "+251 911 200 301", role: "owner", status: "active", createdAt: iso(399 * DAY) },
     { id: "u-cashier", fullName: "Dawit Bekele", username: "cashier", password: "cashier123", phone: "+251 912 410 552", role: "cashier", status: "active", createdAt: iso(380 * DAY) },
     { id: "u-cashier2", fullName: "Hanna Girma", username: "hanna", password: "cashier123", phone: "+251 913 778 019", role: "cashier", status: "active", createdAt: iso(200 * DAY) },
     { id: "u-finance", fullName: "Meron Alemu", username: "finance", password: "finance123", phone: "+251 911 905 117", role: "finance", status: "active", createdAt: iso(390 * DAY) },

@@ -396,7 +396,7 @@ route("GET", "/dashboard/cashier", ["cashier"], (ctx) => {
     approved: by(["approved"]),
     rejected: by(["rejected"]),
     pendingPrice: by(["pending_price_approval"]),
-    recent: s.transactions.slice(0, 7),
+    recent: s.transactions.slice(0, 20),
   };
 });
 
@@ -489,8 +489,13 @@ route("POST", "/users", ["admin", "finance"], (ctx) => {
   const { fullName, username, phone, role, password } = ctx.body;
   if (!String(fullName ?? "").trim() || !String(username ?? "").trim())
     fail("Full name and username are required.");
-  if (!["admin", "cashier", "finance"].includes(role)) fail("Choose a valid role.");
-  if (ctx.actor!.role === "finance" && role === "admin") fail("Finance Managers cannot create Administrator accounts.");
+  if (!["admin", "owner", "cashier", "finance"].includes(role)) fail("Choose a valid role.");
+  if (role === "owner" && !["admin", "owner"].includes(ctx.actor!.role))
+    fail("Only Owners or System Administrators can create Owner accounts.", 403);
+  if (role === "admin" && ctx.actor!.role !== "admin")
+    fail("Only System Administrators can create Administrator accounts.", 403);
+  if (ctx.actor!.role === "finance" && (role === "admin" || role === "owner"))
+    fail("Finance Managers cannot create Administrator or Owner accounts.", 403);
   if (String(password ?? "").length < 6) fail("Password must be at least 6 characters.");
   const uname = String(username).trim().toLowerCase();
   if ([...s.staff, ...s.guests].some((u) => u.username.toLowerCase() === uname))
@@ -513,9 +518,12 @@ route("PUT", "/users/:id", ["admin", "finance"], (ctx) => {
   const s = db();
   const u = s.staff.find((x) => x.id === ctx.params.id) ?? fail("User not found", 404);
   const { fullName, phone, role } = ctx.body;
-  if (role && !["admin", "cashier", "finance"].includes(role)) fail("Choose a valid role.");
-  if (ctx.actor!.role === "finance" && (u!.role === "admin" || role === "admin")) {
-    fail("Finance Managers cannot manage Administrator accounts.");
+  if (role && !["admin", "owner", "cashier", "finance"].includes(role)) fail("Choose a valid role.");
+  if (
+    ctx.actor!.role === "finance" &&
+    (u!.role === "admin" || u!.role === "owner" || role === "admin" || role === "owner")
+  ) {
+    fail("Finance Managers cannot manage Administrator or Owner accounts.", 403);
   }
   if (fullName) u!.fullName = String(fullName).trim();
   if (phone !== undefined) u!.phone = String(phone);
@@ -525,8 +533,8 @@ route("PUT", "/users/:id", ["admin", "finance"], (ctx) => {
 });
 route("POST", "/users/:id/status", ["admin", "finance"], (ctx) => {
   const u = db().staff.find((x) => x.id === ctx.params.id) ?? fail("User not found", 404);
-  if (ctx.actor!.role === "finance" && u!.role === "admin") {
-    fail("Finance Managers cannot manage Administrator accounts.");
+  if (ctx.actor!.role === "finance" && (u!.role === "admin" || u!.role === "owner")) {
+    fail("Finance Managers cannot manage Administrator or Owner accounts.", 403);
   }
   if (u!.id === ctx.actor!.id) fail("You cannot change your own account status.");
   u!.status = ctx.body.status;
@@ -539,8 +547,8 @@ route("POST", "/users/:id/reset-password", ["admin", "finance"], (ctx) => {
     s.staff.find((x) => x.id === ctx.params.id) ??
     s.guests.find((x) => x.id === ctx.params.id) ??
     fail("Account not found", 404);
-  if (ctx.actor!.role === "finance" && "role" in u! && u!.role === "admin") {
-    fail("Finance Managers cannot manage Administrator accounts.");
+  if (ctx.actor!.role === "finance" && "role" in u! && (u!.role === "admin" || u!.role === "owner")) {
+    fail("Finance Managers cannot manage Administrator or Owner accounts.", 403);
   }
   if (String(ctx.body.newPassword ?? "").length < 6)
     fail("Password must be at least 6 characters.");
@@ -848,7 +856,7 @@ route("POST", "/transactions", ["cashier"], (ctx) => {
 });
 route("POST", "/transactions/:id/draft", ["cashier"], (ctx) => {
   const tx = findTx(ctx.params.id);
-  if (tx.createdBy !== ctx.actor!.name)
+  if (ctx.actor!.role !== "owner" && tx.createdBy !== ctx.actor!.name)
     fail("Only the creating Cashier can edit this transaction.", 403);
   if (tx.status !== "draft") fail("Only draft transactions can be edited.");
   tx.items = buildItems(ctx.body.items);
@@ -861,7 +869,7 @@ route("POST", "/transactions/:id/draft", ["cashier"], (ctx) => {
 });
 route("PUT", "/transactions/:id", ["cashier"], (ctx) => {
   const tx = findTx(ctx.params.id);
-  if (tx.createdBy !== ctx.actor!.name)
+  if (ctx.actor!.role !== "owner" && tx.createdBy !== ctx.actor!.name)
     fail("Only the creating Cashier can correct this transaction.", 403);
   if (!["disputed", "pending_guest", "pending_price_approval"].includes(tx.status))
     fail("Only disputed or unconfirmed transactions can be corrected.");
@@ -919,8 +927,12 @@ route("POST", "/transactions/:id/confirm-in-hotel", ["cashier"], (ctx) => {
   if (tx.status !== "pending_guest") fail("This transaction is not awaiting confirmation.");
   const g = findGuest(tx.guestId);
   const method = ctx.body.method === "otp" ? "otp" : "pin";
-  const code = String(ctx.body.code ?? "");
-  if (method === "pin" && code !== g.pin) fail("Incorrect PIN. Ask the guest to enter it again.");
+  const code = String(ctx.body.code ?? "").trim();
+  if (method === "pin" && !code) fail("Enter the guest confirmation PIN.");
+  if (method === "pin" && !g.pin)
+    fail("This guest has not set a confirmation PIN. Ask them to set one from Profile.");
+  if (method === "pin" && code !== g.pin)
+    fail("The guest confirmation PIN is incorrect. Check it and try again.");
   if (method === "otp" && code !== otpCodes.get(tx.id))
     fail("Incorrect or expired one-time password.");
   otpCodes.delete(tx.id);
@@ -954,7 +966,7 @@ route("POST", "/transactions/:id/dispute", ["guest"], (ctx) => {
 });
 route("POST", "/transactions/:id/cancel", ["cashier"], (ctx) => {
   const tx = findTx(ctx.params.id);
-  if (tx.createdBy !== ctx.actor!.name)
+  if (ctx.actor!.role !== "owner" && tx.createdBy !== ctx.actor!.name)
     fail("Only the creating Cashier can cancel this transaction.", 403);
   if (
     !["draft", "disputed", "pending_guest", "expired", "pending_price_approval"].includes(tx.status)
@@ -1592,7 +1604,9 @@ export async function demoRequest<T>(
       window.dispatchEvent(new Event(UNAUTHORIZED_EVENT));
       throw new ApiError("Your session has ended. Please sign in again.", 401);
     }
-    if (def.roles.length && !def.roles.includes(actor.role))
+    const ownerAllowed =
+      actor.role === "owner" && def.roles.some((role) => ["admin", "cashier", "finance"].includes(role));
+    if (def.roles.length && !def.roles.includes(actor.role) && !ownerAllowed)
       throw new ApiError("You do not have permission to do this.", 403);
   }
   sweepDeadlines();

@@ -12,7 +12,7 @@ final class UserManagementService
     {
     }
 
-    public function create(int $administratorId, array $data): int
+    public function create(int $administratorId, array $data, string $actorRole): int
     {
         Http::requireFields($data, ['username', 'password', 'role', 'full_name']);
         if (array_diff(array_keys($data), ['username', 'password', 'role', 'full_name', 'phone']) !== []) {
@@ -28,8 +28,12 @@ final class UserManagementService
         if ($fullName === '' || mb_strlen($fullName, 'UTF-8') > 180) {
             throw new ApiException(422, 'Full name must contain 1 to 180 characters.');
         }
-        if (!in_array($role, ['cashier', 'finance_manager', 'guest'], true)) {
-            throw new ApiException(422, 'Only Cashier, Finance Manager, and Guest accounts can be created here.');
+        $creatableRoles = ['cashier', 'finance_manager', 'guest'];
+        if (in_array($actorRole, ['system_administrator', 'owner'], true)) {
+            $creatableRoles[] = 'owner';
+        }
+        if (!in_array($role, $creatableRoles, true)) {
+            throw new ApiException(422, 'This account cannot create the selected role.');
         }
         if (!is_string($data['password']) || strlen($data['password']) < 12 || strlen($data['password']) > 72) {
             throw new ApiException(422, 'Password must be 12 to 72 bytes long.');
@@ -90,8 +94,12 @@ final class UserManagementService
         )->fetchAll();
     }
 
-    public function updateProfile(int $targetUserId, int $administratorId, array $data): void
-    {
+    public function updateProfile(
+        int $targetUserId,
+        int $administratorId,
+        array $data,
+        string $actorRole
+    ): void {
         if ($data === [] || array_diff(array_keys($data), ['username', 'full_name', 'phone', 'role']) !== []) {
             throw new ApiException(422, 'Provide one or more of username, full_name, phone, and role only.');
         }
@@ -116,8 +124,11 @@ final class UserManagementService
         }
         if (array_key_exists('role', $data)) {
             $newRole = Http::text($data['role'], 'role', 32);
-            if (!in_array($newRole, ['system_administrator', 'cashier', 'finance_manager'], true)) {
-                throw new ApiException(422, 'Role must be System Administrator, Cashier, or Finance Manager.');
+            $assignableRoles = in_array($actorRole, ['system_administrator', 'owner'], true)
+                ? ['system_administrator', 'owner', 'cashier', 'finance_manager']
+                : ['cashier', 'finance_manager'];
+            if (!in_array($newRole, $assignableRoles, true)) {
+                throw new ApiException(403, 'You cannot assign the selected role.');
             }
         }
 
