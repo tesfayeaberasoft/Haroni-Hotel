@@ -71,7 +71,7 @@ try {
         Http::csrf();
     }
     if ($user['must_change_password']
-        && !in_array($path, ['/api/profile/password', '/api/logout'], true)) {
+        && !in_array($path, ['/api/me', '/api/profile/password', '/api/logout'], true)) {
         throw new ApiException(403, 'Change your temporary password before using the system.');
     }
 
