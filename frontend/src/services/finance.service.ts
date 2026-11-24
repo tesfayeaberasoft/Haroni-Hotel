@@ -209,19 +209,19 @@ export const reportsService = {
       return {
         title: "Financial Summary",
         period,
-        from: phpText(summary.from),
-        to: phpText(summary.to),
+        from: phpText(summary["from"]),
+        to: phpText(summary["to"]),
         columns: [{ key: "metric", label: "Metric" }, { key: "value", label: "Value" }],
         rows,
         totals: [
-          { label: "Approved credit", value: phpNumber(summary.approved_credits) },
-          { label: "Payments received", value: phpNumber(summary.payments_received) },
+          { label: "Approved credit", value: phpNumber(summary["approved_credits"]) },
+          { label: "Payments received", value: phpNumber(summary["payments_received"]) },
           { label: "Total outstanding", value: phpNumber(summary.outstanding_debt) },
         ],
-        series: phpRows(dashboard.series).map((month) => ({
-          label: phpText(month.label),
-          credit: phpNumber(month.credit),
-          payments: phpNumber(month.payments),
+        series: phpRows(dashboard["series"]).map((month) => ({
+          label: phpText(month["label"]),
+          credit: phpNumber(month["credit"]),
+          payments: phpNumber(month["payments"]),
         })),
       } satisfies ReportResult;
     }
@@ -245,21 +245,21 @@ export const reportsService = {
         return [key, typeof value === "string" || typeof value === "number" ? value : String(value ?? "")];
       })),
     );
-    const reportTotals = phpRows(response.totals)
-      .filter((total) => type !== "guest_debt" || total.label === "Total outstanding")
-      .map((total) => ({ label: phpText(total.label), value: phpNumber(total.value) }));
+    const reportTotals = phpRows(response["totals"])
+      .filter((total) => type !== "guest_debt" || total["label"] === "Total outstanding")
+      .map((total) => ({ label: phpText(total["label"]), value: phpNumber(total["value"]) }));
     return {
       title: phpText(response.title, "Financial Report"),
       period,
-      from: phpText(response.from),
-      to: phpText(response.to),
+      from: phpText(response["from"]),
+      to: phpText(response["to"]),
       columns: keys.map((key) => ({ key, label: key.replaceAll("_", " ") })),
       rows,
       totals: reportTotals,
-      series: phpRows(dashboard.series).map((month) => ({
-        label: phpText(month.label),
-        credit: phpNumber(month.credit),
-        payments: phpNumber(month.payments),
+      series: phpRows(dashboard["series"]).map((month) => ({
+        label: phpText(month["label"]),
+        credit: phpNumber(month["credit"]),
+        payments: phpNumber(month["payments"]),
       })),
     };
   },

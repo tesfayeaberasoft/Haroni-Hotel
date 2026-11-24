@@ -94,7 +94,20 @@ export function GuestDashboard() {
         </Button>
       </div>
       {data.pending.length > 0 ? (
-        <Panel className="mt-6 border-primary/35 bg-gold-soft" delay={60}>
+        <Panel
+          className="mt-6 cursor-pointer border-primary/35 bg-gold-soft transition-shadow hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          delay={60}
+          role="button"
+          tabIndex={0}
+          aria-haspopup="dialog"
+          onClick={() => setPendingOpen(true)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              setPendingOpen(true);
+            }
+          }}
+        >
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div className="flex items-start gap-3">
               <Hourglass className="mt-1 h-5 w-5 text-primary" />
@@ -444,16 +457,7 @@ export function GuestHistory() {
         rows={rows}
         showGuest={false}
         empty="No transactions match this filter."
-        actions={(t) => (
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setSelectedId(t.id)}
-            aria-label={`View ${t.code}`}
-          >
-            <Eye className="h-4 w-4" /> View
-          </Button>
-        )}
+        onRowClick={(t) => setSelectedId(t.id)}
       />
       <Dialog open={selectedId !== null} onOpenChange={(o) => !o && setSelectedId(null)}>
         <DialogContent

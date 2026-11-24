@@ -35,7 +35,7 @@ export function FinanceApprovalViews({
           rows={approvals}
           onRowClick={onSelect}
           {...(!onSelect ? { detailTo: "/finance/transactions/$id" as const } : {})}
-          actions={(tx) => <DecisionActions tx={tx} />}
+          {...(!onSelect ? { actions: (tx: CreditTransaction) => <DecisionActions tx={tx} /> } : {})}
           empty="Nothing is waiting for approval."
         />
       </TabsContent>
@@ -44,7 +44,7 @@ export function FinanceApprovalViews({
           rows={exceptions}
           onRowClick={onSelect}
           {...(!onSelect ? { detailTo: "/finance/transactions/$id" as const } : {})}
-          actions={(tx) => <DecisionActions tx={tx} />}
+          {...(!onSelect ? { actions: (tx: CreditTransaction) => <DecisionActions tx={tx} /> } : {})}
           empty="No exceptional credit is waiting."
         />
       </TabsContent>

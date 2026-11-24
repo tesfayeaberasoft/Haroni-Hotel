@@ -326,9 +326,8 @@ export function TransactionsTable({
         <TableHeader>
           <TableRow>
             <TableHead>Transaction</TableHead>
-            {showGuest && <TableHead>Guest</TableHead>}
-            <TableHead className="min-w-[220px]">Services</TableHead>
-            <TableHead>Date</TableHead>
+            {showGuest && <TableHead className="hidden sm:table-cell">Guest</TableHead>}
+            <TableHead className="hidden md:table-cell">Date</TableHead>
             <TableHead className="text-right">Amount</TableHead>
             <TableHead>Status</TableHead>
             {actions && <TableHead className="text-right">Actions</TableHead>}
@@ -387,11 +386,19 @@ export function TransactionsTable({
                 ) : (
                   t.code
                 )}
+                {showGuest && (
+                  <div className="truncate text-xs font-normal text-muted-foreground sm:hidden">
+                    {t.guestName}
+                  </div>
+                )}
               </TableCell>
-              {showGuest && <TableCell className="whitespace-nowrap">{t.guestName}</TableCell>}
-              <TableCell className="text-sm text-muted-foreground">{itemsSummary(t)}</TableCell>
-              <TableCell className="whitespace-nowrap text-sm">{date(t.consumptionDate)}</TableCell>
-              <TableCell className="text-right font-semibold tabular-nums">
+              {showGuest && (
+                <TableCell className="hidden whitespace-nowrap sm:table-cell">{t.guestName}</TableCell>
+              )}
+              <TableCell className="hidden whitespace-nowrap text-sm text-muted-foreground md:table-cell">
+                {date(t.consumptionDate)}
+              </TableCell>
+              <TableCell className="whitespace-nowrap text-right font-semibold tabular-nums">
                 {money(t.total)}
               </TableCell>
               <TableCell>

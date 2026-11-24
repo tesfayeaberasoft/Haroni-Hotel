@@ -1,13 +1,13 @@
 {
-  "source": "code-archive (bunfig.zip \u2014 Haroni Hotel DCMS frontend, partially migrated in an earlier Lovable project)",
-  "decision": "User chose to keep their own PHP + MySQL server for data and logins (answered in this project). App uses built-in demo backend until VITE_API_BASE_URL is set.",
+  "source": "code-archive (haroni_hotel_frontend.zip \u2014 Haroni Hotel DCMS frontend)",
+  "decision": "User keeps own PHP + MySQL server for data and logins (restated in UI/UX brief: do not alter API URLs, payloads, parsing or role guards). Preview (dev mode) uses built-in sample data via .env.development; production builds call same-origin /api.",
   "capabilities": [
     {
       "capability": "code",
       "source": "TanStack Start frontend (same Lovable template)",
       "outcome": "migrate",
       "status": "verified",
-      "next_action": "None \u2014 all 4 portals built; typecheck clean, 15 tests pass, every page opened in browser with no errors"
+      "next_action": "None \u2014 imported; typecheck clean, 45 tests pass, every portal opened in browser (desktop + mobile) with no errors; UI/UX audit applied"
     },
     {
       "capability": "schema",
@@ -28,7 +28,7 @@
       "source": "PHP token auth (username/password, Bearer token)",
       "outcome": "preserve PHP auth (user choice)",
       "status": "pending",
-      "next_action": "Live login check once PHP URL provided"
+      "next_action": "User's PHP server is http://localhost (XAMPP): works when running locally via Vite /api proxy. Online preview/published app need a public HTTPS address for the PHP server"
     },
     {
       "capability": "authorization",
@@ -49,7 +49,7 @@
       "source": "PHP backend REST API",
       "outcome": "preserve",
       "status": "pending",
-      "next_action": "User supplies backend web address"
+      "next_action": "User's PHP server is http://localhost (XAMPP): works when running locally via Vite /api proxy. Online preview/published app need a public HTTPS address for the PHP server"
     },
     {
       "capability": "public endpoints/callbacks/webhooks/schedules",
@@ -63,7 +63,7 @@
       "source": "VITE_API_BASE_URL (public config, not a secret)",
       "outcome": "preserve",
       "status": "pending",
-      "next_action": "Set when backend URL provided"
+      "next_action": "User's PHP server is http://localhost (XAMPP): works when running locally via Vite /api proxy. Online preview/published app need a public HTTPS address for the PHP server"
     },
     {
       "capability": "PDF/Excel exports",
@@ -77,7 +77,7 @@
       "source": "-",
       "outcome": "pending",
       "status": "pending",
-      "next_action": "Point VITE_API_BASE_URL at PHP server; server must allow CORS from the Lovable domain"
+      "next_action": "User's PHP server is http://localhost (XAMPP): works when running locally via Vite /api proxy. Online preview/published app need a public HTTPS address for the PHP server"
     },
     {
       "capability": "verification",

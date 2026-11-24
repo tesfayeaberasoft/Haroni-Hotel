@@ -16,11 +16,11 @@ export interface BackupCreation {
 }
 
 function mapBackup(value: PhpRow): BackupInfo {
-  const sizeBytes = phpNumber(value.size_bytes);
+  const sizeBytes = phpNumber(value["size_bytes"]);
   return {
-    id: phpText(value.filename ?? value.id),
+    id: phpText(value["filename"] ?? value.id),
     createdAt: phpDate(value.created_at),
-    createdBy: phpText(value.created_by, "Server"),
+    createdBy: phpText(value["created_by"], "Server"),
     sizeKb: Math.ceil(sizeBytes / 1024),
   };
 }
@@ -28,16 +28,16 @@ function mapBackup(value: PhpRow): BackupInfo {
 function mapSettings(value: PhpRow): SystemSettings {
   return {
     hotelName: phpText(value.hotel_name),
-    hotelAddress: phpText(value.hotel_address),
-    hotelPhone: phpText(value.hotel_phone),
-    hotelEmail: phpText(value.hotel_email),
-    hotelTin: phpText(value.hotel_tin),
-    currency: phpText(value.currency),
+    hotelAddress: phpText(value["hotel_address"]),
+    hotelPhone: phpText(value["hotel_phone"]),
+    hotelEmail: phpText(value["hotel_email"]),
+    hotelTin: phpText(value["hotel_tin"]),
+    currency: phpText(value["currency"]),
     confirmationDeadlineHours: phpNumber(value.confirmation_deadline_hours),
-    reminderBeforeHours: phpNumber(value.reminder_before_hours),
+    reminderBeforeHours: phpNumber(value["reminder_before_hours"]),
     historicalDebtTarget: phpNumber(value.historical_debt_expected_total),
-    receiptFooter: phpText(value.receipt_footer),
-    smsRemindersEnabled: phpText(value.sms_reminders_enabled) === "1",
+    receiptFooter: phpText(value["receipt_footer"]),
+    smsRemindersEnabled: phpText(value["sms_reminders_enabled"]) === "1",
   };
 }
 

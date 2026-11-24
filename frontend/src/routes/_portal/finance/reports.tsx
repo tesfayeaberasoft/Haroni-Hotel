@@ -109,7 +109,7 @@ function ReportsPage() {
       ) : (
         <>
           {r.totals.length > 0 && (
-            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            <div className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
               {r.totals.map((t, i) => (
                 <div key={t.label} className="rounded-xl border bg-card p-5 shadow-card animate-fade-up" style={{ animationDelay: `${i * 40}ms` }}>
                   <div className="text-xs font-medium uppercase tracking-wider text-muted-foreground">{t.label}</div>

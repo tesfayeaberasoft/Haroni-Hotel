@@ -66,19 +66,16 @@ export function UsersPage() {
           <TableHeader>
             <TableRow>
               <TableHead>Name</TableHead>
-              <TableHead>Username</TableHead>
-              <TableHead>Phone</TableHead>
               <TableHead>Role</TableHead>
               <TableHead>Status</TableHead>
-              <TableHead>Last sign-in</TableHead>
-              <TableHead className="w-12" />
             </TableRow>
           </TableHeader>
           <TableBody>
             {list.map((u) => (
               <TableRow
                 key={u.id}
-                className="cursor-pointer transition-colors hover:bg-muted/50"
+                className="cursor-pointer transition-colors hover:bg-muted/60 focus-visible:bg-muted/60 focus-visible:outline-none"
+                aria-haspopup="dialog"
                 tabIndex={0}
                 aria-label={`View details for ${u.fullName}`}
                 onClick={() => setSelectedId(u.id)}
@@ -90,45 +87,11 @@ export function UsersPage() {
                 }}
               >
                 <TableCell className="font-semibold">{u.fullName}</TableCell>
-                <TableCell className="text-muted-foreground">@{u.username}</TableCell>
-                <TableCell className="whitespace-nowrap">{u.phone}</TableCell>
                 <TableCell>
                   <Badge variant={u.role === "owner" ? "success" : u.role === "admin" ? "info" : u.role === "finance" ? "gold" : "muted"}>{ROLE_LABEL[u.role]}</Badge>
                 </TableCell>
                 <TableCell>
                   <AccountStatusBadge status={u.status} />
-                </TableCell>
-                <TableCell className="whitespace-nowrap text-sm text-muted-foreground">{dateTime(u.lastLoginAt)}</TableCell>
-                <TableCell>
-                  {canManageUser(u) ? (
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon" aria-label={`Actions for ${u.fullName}`} onClick={(event) => event.stopPropagation()}>
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => setEditing(u)}>
-                          <Pencil className="h-4 w-4" /> Edit details & role
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => setResetting(u)}>
-                          <KeyRound className="h-4 w-4" /> Reset password
-                        </DropdownMenuItem>
-                        {u.id !== session?.user.id && (
-                          <>
-                            <DropdownMenuSeparator />
-                            {(["active", "inactive", ...(USE_DEMO_BACKEND ? ["suspended" as const] : [])] as AccountStatus[])
-                              .filter((s) => s !== u.status)
-                              .map((s) => (
-                                <DropdownMenuItem key={s} onClick={() => setStatus.mutate({ id: u.id, status: s })}>
-                                  <Power className="h-4 w-4" /> {s === "active" ? "Activate" : s === "inactive" ? "Deactivate" : "Suspend"}
-                                </DropdownMenuItem>
-                              ))}
-                          </>
-                        )}
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  ) : null}
                 </TableCell>
               </TableRow>
             ))}

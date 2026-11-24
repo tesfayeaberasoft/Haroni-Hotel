@@ -32,6 +32,7 @@ use the editor.
 ## Project rules (Haroni Hotel DCMS)
 
 - All data access goes through `src/services/http.ts` (`api.*`); pages never call `fetch` directly. Why: one switch point between the external PHP REST backend and the in-browser demo backend.
-- `VITE_API_BASE_URL` selects the live PHP backend; when unset, `src/services/mock/handlers.ts` serves the same API contract from localStorage. Why: the data/auth server lives outside Lovable; keep the demo handlers in sync with any API change.
+- Data and logins live on the user's own PHP + MySQL server (user choice); the app calls same-origin `/api`. `VITE_USE_DEMO_BACKEND=true` switches to `src/services/mock/handlers.ts`, which serves the same API contract from localStorage. Why: the data/auth server lives outside Lovable; keep demo handlers in sync with any API change and never change endpoint URLs, payloads or response parsing during UI work.
 - Shared credit math lives in `src/lib/credit.ts` and is used by both UI and demo backend. Why: UI and backend must agree on balances.
-- Portal pages live under `src/routes/_portal/<role>/` with `ssr: false` on the layout and `requireRole` in each role's `route.tsx`. Why: the session token lives in browser storage; the server enforces roles on every request.
+- Portal pages live under `src/routes/_portal/<role>/` with `ssr: false` on the layout and `requireRole` in each role's `route.tsx`. Why: the session lives in browser storage/cookies; the server enforces roles on every request.
+- Lists open details in modals: clickable rows/cards open a compact detail dialog holding the item's actions, instead of navigating to separate pages. Why: dashboard-centric workflow requested by the user.

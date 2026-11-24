@@ -54,7 +54,7 @@ describe("live financial summary reports", () => {
       ],
     });
     expect(report.rows).toContainEqual({ metric: "pending approvals", value: 3 });
-    expect(report.rows.some((row) => row.metric === "generated at utc")).toBe(false);
+    expect(report.rows.some((row) => row["metric"] === "generated at utc")).toBe(false);
   });
 
   it.each([
@@ -84,7 +84,7 @@ describe("live financial summary reports", () => {
             { label: "Approved opening balances", value: "1000.00" },
             { label: "Pending verification", value: "200.00" },
             { label: "Unreconciled vs target", value: "50.00" },
-          ].filter((total) => labels.includes(total.label as (typeof labels)[number])
+          ].filter((total) => (labels as readonly string[]).includes(total.label)
             || (type === "guest_debt" && total.label === "Guests over limit")),
         } as never;
       }

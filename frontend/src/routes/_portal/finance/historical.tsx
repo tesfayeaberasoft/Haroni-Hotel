@@ -104,9 +104,10 @@ function HistoricalPage() {
           </>
         }
       />
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
         <StatCard
           label="Target from paper records"
+          onClick={() => setTab("all")}
           value={moneyCompact(r.target)}
           hint={money(r.target)}
           icon={Landmark}
@@ -114,6 +115,7 @@ function HistoricalPage() {
         />
         <StatCard
           label="Verified opening balances"
+          onClick={() => setTab("approved")}
           value={moneyCompact(r.approved)}
           hint={`${pct.toFixed(1)}% of target`}
           icon={BadgeCheck}
@@ -123,6 +125,7 @@ function HistoricalPage() {
         />
         <StatCard
           label="Awaiting verification"
+          onClick={() => setTab("pending_verification")}
           value={moneyCompact(r.pending)}
           hint={money(r.pending)}
           icon={Hourglass}
@@ -131,6 +134,7 @@ function HistoricalPage() {
         />
         <StatCard
           label="Difference to target"
+          onClick={() => setTab("rejected")}
           value={moneyCompact(r.difference)}
           hint={`${r.records} records · ${money(r.rejected)} rejected`}
           icon={Scale}
@@ -180,13 +184,13 @@ function HistoricalPage() {
         <EmptyState title="No records here" />
       ) : (
         <TableShell>
-          <Table className="w-full table-fixed">
+          <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="w-1/4">Guest</TableHead>
-                <TableHead className="w-2/5">Source reference</TableHead>
-                <TableHead className="w-[18%] text-right">Amount</TableHead>
-                <TableHead className="w-[17%]">Status</TableHead>
+                <TableHead>Guest</TableHead>
+                <TableHead className="hidden sm:table-cell">Source reference</TableHead>
+                <TableHead className="text-right">Amount</TableHead>
+                <TableHead>Status</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -209,8 +213,9 @@ function HistoricalPage() {
 function HistoricalRow({ h, onSelect }: { h: HistoricalDebt; onSelect: () => void }) {
   return (
     <TableRow
-      className="cursor-pointer transition-colors hover:bg-muted/60 focus-visible:bg-muted/60"
+      className="cursor-pointer transition-colors hover:bg-muted/60 focus-visible:bg-muted/60 focus-visible:outline-none"
       tabIndex={0}
+      aria-haspopup="dialog"
       aria-label={`View historical debt record for ${h.guestName}`}
       onClick={(event) => {
         if (event.target instanceof Element && event.target.closest("button")) return;
@@ -225,14 +230,12 @@ function HistoricalRow({ h, onSelect }: { h: HistoricalDebt; onSelect: () => voi
       }}
     >
       <TableCell className="whitespace-nowrap font-medium">{h.guestName}</TableCell>
-      <TableCell className="text-sm">
+      <TableCell className="hidden truncate text-sm text-muted-foreground sm:table-cell">
         {h.sourceReference}
-        {h.evidenceNote && <div className="text-xs text-muted-foreground">{h.evidenceNote}</div>}
       </TableCell>
       <TableCell className="text-right font-semibold tabular-nums">{money(h.amount)}</TableCell>
       <TableCell>
         <HistoricalStatusBadge status={h.status} />
-        {h.verifiedBy && <div className="mt-1 text-xs text-muted-foreground">{h.verifiedBy}</div>}
       </TableCell>
     </TableRow>
   );

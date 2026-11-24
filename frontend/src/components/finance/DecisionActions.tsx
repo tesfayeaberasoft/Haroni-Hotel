@@ -9,14 +9,17 @@ import { transactionsService } from "@/services/transactions.service";
 import type { CreditTransaction } from "@/types";
 
 /** Approve / reject buttons for a transaction awaiting Finance. Exceptions need a written reason to approve. */
-export function DecisionActions({ tx, size = "sm", block = false }: { tx: CreditTransaction; size?: "sm" | "default"; block?: boolean }) {
+export function DecisionActions({ tx, size = "sm", block = false, onDone }: { tx: CreditTransaction; size?: "sm" | "default"; block?: boolean; onDone?: (() => void) | undefined }) {
   const [mode, setMode] = useState<"approve" | "reject" | null>(null);
   const isException = tx.status === "pending_exception";
   const approve = useAction((reason?: string) => transactionsService.approve(tx.id, reason), {
     success: `${tx.code} approved and added to ${tx.guestName}'s debt.`,
-    onSuccess: () => setMode(null),
+    onSuccess: () => {
+      setMode(null);
+      onDone?.();
+    },
   });
-  const reject = useAction((reason: string) => transactionsService.reject(tx.id, reason), { success: `${tx.code} rejected.`, onSuccess: () => setMode(null) });
+  const reject = useAction((reason: string) => transactionsService.reject(tx.id, reason), { success: `${tx.code} rejected.`, onSuccess: () => { setMode(null); onDone?.(); } });
 
   if (tx.status !== "pending_finance" && tx.status !== "pending_exception") return null;
   const cls = block ? "w-full" : "";

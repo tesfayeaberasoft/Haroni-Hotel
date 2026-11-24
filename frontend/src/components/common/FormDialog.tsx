@@ -29,7 +29,7 @@ export function FormDialog({
   open: boolean;
   onOpenChange: (o: boolean) => void;
   title: string;
-  description?: string;
+  description?: string | undefined;
   submitLabel?: string;
   pending?: boolean;
   onSubmit: () => void;

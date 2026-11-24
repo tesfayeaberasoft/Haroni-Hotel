@@ -13,6 +13,7 @@ import { SearchInput } from "@/components/common/SearchInput";
 import { EmptyState, Spinner } from "@/components/common/States";
 import { FormDialog, TextField } from "@/components/common/FormDialog";
 import { AccountStatusBadge, HistoricalStatusBadge } from "@/components/common/StatusBadge";
+import { DecisionActions } from "@/components/finance/DecisionActions";
 import { PaymentsTable } from "@/components/finance/PaymentParts";
 import { CreditLimitDialog } from "@/components/finance/CreditLimitDialog";
 import { HistoricalRecordDialog } from "@/components/finance/HistoricalViews";
@@ -104,40 +105,23 @@ export function GuestFinanceList({
         <EmptyState title="No guests found" />
       ) : (
         <TableShell>
-          <Table className={compactColumns ? "w-full table-fixed" : undefined}>
+          <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className={compactColumns ? "h-9 w-[40%] px-3" : undefined}>
-                  Guest
-                </TableHead>
-                {!compactColumns && <TableHead>Status</TableHead>}
-                {!compactColumns && <TableHead className="text-right">Credit limit</TableHead>}
-                {compactColumns && <TableHead className="h-9 w-[15%] px-2 text-right">Credit limit</TableHead>}
-                <TableHead
-                  className={compactColumns ? "h-9 w-[15%] px-2 text-right" : "text-right"}
-                >
-                  Outstanding
-                </TableHead>
-                {compactColumns && (
-                  <TableHead className="h-9 w-[15%] px-2 text-right">
-                    Pending reservations
-                  </TableHead>
-                )}
-                {!compactColumns && <TableHead className="text-right">Pending</TableHead>}
-                <TableHead
-                  className={compactColumns ? "h-9 w-[15%] px-2 text-right" : "text-right"}
-                >
-                  {compactColumns ? "Available credit" : "Available"}
-                </TableHead>
+                <TableHead>Guest</TableHead>
+                <TableHead className="hidden text-right md:table-cell">Credit limit</TableHead>
+                <TableHead className="text-right">Outstanding</TableHead>
+                <TableHead className="hidden text-right sm:table-cell">Available</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {rows.map((guest) => (
                 <TableRow
                   key={guest.id}
-                  className="cursor-pointer transition-colors hover:bg-muted/60 focus-visible:bg-muted/60"
+                  className="cursor-pointer transition-colors hover:bg-muted/60 focus-visible:bg-muted/60 focus-visible:outline-none"
                   tabIndex={0}
                   aria-label={`View finances for ${guest.fullName}`}
+                  aria-haspopup="dialog"
                   onClick={() => onSelect(guest)}
                   onKeyDown={(event) => {
                     if (event.key === "Enter" || event.key === " ") {
@@ -146,97 +130,38 @@ export function GuestFinanceList({
                     }
                   }}
                 >
-                  <TableCell
-                    className={compactColumns ? "px-3 py-2 font-semibold" : "font-semibold"}
-                  >
-                    {guest.fullName}
-                    <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs font-normal text-muted-foreground">
-                      <span>@{guest.username}</span>
-                      <span>{guest.phone || "No phone"}</span>
-                      {compactColumns && <AccountStatusBadge status={guest.status} />}
-                      {compactColumns && <span>Registered {date(guest.createdAt)}</span>}
+                  <TableCell className="font-semibold">
+                    <div className="flex min-w-0 items-center gap-2">
+                      <span className="truncate">{guest.fullName}</span>
+                      {guest.status !== "active" && <AccountStatusBadge status={guest.status} />}
                     </div>
                   </TableCell>
-                  {!compactColumns && (
-                    <TableCell>
-                      <AccountStatusBadge status={guest.status} />
-                    </TableCell>
-                  )}
-                  {!compactColumns && (
-                    <TableCell className="text-right tabular-nums">
-                      {money(guest.creditLimit)}
-                    </TableCell>
-                  )}
-                  {compactColumns && (
-                    <TableCell className="px-2 py-2 text-right tabular-nums">
-                      {money(guest.creditLimit)}
-                    </TableCell>
-                  )}
-                  <TableCell
-                    className={
-                      compactColumns
-                        ? "px-2 py-2 text-right font-semibold tabular-nums"
-                        : "text-right font-semibold tabular-nums"
-                    }
-                  >
+                  <TableCell className="hidden whitespace-nowrap text-right tabular-nums text-muted-foreground md:table-cell">
+                    {money(guest.creditLimit)}
+                  </TableCell>
+                  <TableCell className="whitespace-nowrap text-right font-semibold tabular-nums">
                     {guest.exceedsLimit && (
-                      <AlertTriangle className="mr-1 inline h-3.5 w-3.5 text-destructive" />
+                      <AlertTriangle
+                        className="mr-1 inline h-3.5 w-3.5 text-destructive"
+                        aria-label="Over limit"
+                      />
                     )}
                     {money(guest.outstandingDebt)}
                   </TableCell>
-                  {!compactColumns && (
-                    <TableCell className="text-right tabular-nums text-muted-foreground">
-                      {money(guest.pendingReservations)}
-                    </TableCell>
-                  )}
-                  {compactColumns && (
-                    <TableCell className="px-2 py-2 text-right tabular-nums text-muted-foreground">
-                      {money(guest.pendingReservations)}
-                    </TableCell>
-                  )}
-                  {!compactColumns && (
-                    <TableCell className="text-right font-semibold text-primary tabular-nums">
-                      {money(guest.availableCredit)}
-                    </TableCell>
-                  )}
-                  {compactColumns && (
-                    <TableCell className="px-3 py-1.5 text-right font-semibold text-primary tabular-nums">
-                      {money(guest.availableCredit)}
-                    </TableCell>
-                  )}
+                  <TableCell className="hidden whitespace-nowrap text-right font-semibold text-primary tabular-nums sm:table-cell">
+                    {money(guest.availableCredit)}
+                  </TableCell>
                 </TableRow>
               ))}
             </TableBody>
             <TableFooter>
               <TableRow>
-                <TableCell
-                  colSpan={compactColumns ? 1 : 3}
-                  className={
-                    compactColumns
-                      ? "px-3 py-1.5 text-right font-semibold"
-                      : "text-right font-semibold"
-                  }
-                >
-                  Total outstanding
-                </TableCell>
-                {compactColumns && <TableCell />}
-                <TableCell
-                  className={
-                    compactColumns
-                      ? "px-3 py-1.5 text-right font-semibold tabular-nums"
-                      : "text-right font-semibold tabular-nums"
-                  }
-                >
+                <TableCell className="font-semibold">Total outstanding</TableCell>
+                <TableCell className="hidden md:table-cell" />
+                <TableCell className="whitespace-nowrap text-right font-semibold tabular-nums">
                   {money(totalDebt)}
                 </TableCell>
-                {compactColumns ? (
-                  <>
-                    <TableCell />
-                    <TableCell />
-                  </>
-                ) : (
-                  <TableCell colSpan={2} />
-                )}
+                <TableCell className="hidden sm:table-cell" />
               </TableRow>
             </TableFooter>
           </Table>
@@ -281,7 +206,8 @@ function GuestFinanceDetailBody({
   const [editingGuest, setEditingGuest] = useState(false);
   const [resettingPassword, setResettingPassword] = useState(false);
   const [confirmStatusChange, setConfirmStatusChange] = useState(false);
-  const { account, transactions, payments } = data;
+  const { account, transactions } = data;
+  const payments = data.payments ?? [];
   const historical = data.historical ?? [];
   const limitChanges = data.limitChanges ?? [];
   const actionNested = !nested;
@@ -745,6 +671,11 @@ function FinanceTransactionDetailBody({
           <DialogDescription>Full transaction information and audit trail.</DialogDescription>
         </DialogHeader>
         <TransactionDetail tx={transaction} compact />
+        {(transaction.status === "pending_finance" || transaction.status === "pending_exception") && (
+          <div className="border-t pt-3">
+            <DecisionActions tx={transaction} onDone={onClose} />
+          </div>
+        )}
       </DialogContent>
     </Dialog>
   );

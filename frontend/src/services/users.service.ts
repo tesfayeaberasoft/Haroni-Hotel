@@ -23,7 +23,7 @@ function mapStaff(value: unknown): StaffUser {
     role,
     status: mapPhpAccountStatus(row.is_active),
     createdAt: phpDate(row.created_at),
-    ...(row.last_login_at ? { lastLoginAt: phpDate(row.last_login_at) } : {}),
+    ...(row["last_login_at"] ? { lastLoginAt: phpDate(row["last_login_at"]) } : {}),
   };
 }
 

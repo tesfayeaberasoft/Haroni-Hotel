@@ -100,7 +100,7 @@ export const dashboardService = {
     const row = await phpDashboard("cashier");
     return {
       totalRecorded: phpNumber(row.total_transactions),
-      recordedByMe: phpNumber(row.recorded_by_me ?? row.total_transactions),
+      recordedByMe: phpNumber(row["recorded_by_me"] ?? row.total_transactions),
       pendingGuest: phpNumber(row.pending_guest_confirmations),
       disputed: phpNumber(row.disputed),
       awaitingFinance: phpNumber(row.awaiting_finance),

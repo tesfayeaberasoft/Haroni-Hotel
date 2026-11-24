@@ -1,5 +1,5 @@
 import { useQueryClient, useSuspenseQuery } from "@tanstack/react-query";
-import { Banknote, Download, Landmark } from "lucide-react";
+import { BadgeCheck, Banknote, Download, Landmark } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import { toast } from "sonner";
 import { FormDialog, TextField } from "@/components/common/FormDialog";
@@ -35,6 +35,7 @@ import {
 } from "@/components/ui/table";
 import { usePaginatedItems } from "@/hooks/use-pagination";
 import { useAction } from "@/hooks/use-action";
+import { useAuth } from "@/hooks/use-auth";
 import { date, dateTime, money } from "@/lib/format";
 import { q } from "@/lib/queries";
 import { errorMessage } from "@/services/http";
@@ -218,6 +219,8 @@ export function PaymentsTable({
   actions?: (p: Payment) => ReactNode;
   onRowClick?: ((payment: Payment) => void) | undefined;
 }) {
+  // Clickable rows open the payment modal, which holds the receipt and verify actions.
+  const showRowActions = !onRowClick;
   if (!rows.length)
     return (
       <EmptyState
@@ -230,16 +233,12 @@ export function PaymentsTable({
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead>Date</TableHead>
+            <TableHead className="hidden sm:table-cell">Date</TableHead>
             <TableHead>Receipt no.</TableHead>
             {showGuest && <TableHead>Guest</TableHead>}
-            <TableHead>Method</TableHead>
-            <TableHead>Reference</TableHead>
             <TableHead className="text-right">Amount</TableHead>
-            <TableHead className="text-right">Remaining balance</TableHead>
-            <TableHead>Recorded by</TableHead>
             <TableHead>Status</TableHead>
-            <TableHead className="text-right">Receipt</TableHead>
+            {showRowActions && <TableHead className="text-right">Receipt</TableHead>}
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -283,24 +282,16 @@ export function PaymentsTable({
                   : undefined
               }
             >
-              <TableCell className="whitespace-nowrap">{date(p.paidAt)}</TableCell>
+              <TableCell className="hidden whitespace-nowrap text-muted-foreground sm:table-cell">
+                {date(p.paidAt)}
+              </TableCell>
               <TableCell className="whitespace-nowrap font-mono text-xs">
                 {p.receiptNumber}
               </TableCell>
               {showGuest && <TableCell className="whitespace-nowrap">{p.guestName}</TableCell>}
-              <TableCell>
-                <PaymentMethodBadge method={p.method} />
-              </TableCell>
-              <TableCell className="whitespace-nowrap text-xs text-muted-foreground">
-                {p.reference ?? "—"}
-              </TableCell>
               <TableCell className="text-right font-semibold tabular-nums">
                 {money(p.amount)}
               </TableCell>
-              <TableCell className="text-right tabular-nums text-muted-foreground">
-                {p.verified ? money(p.balanceAfter) : "—"}
-              </TableCell>
-              <TableCell className="whitespace-nowrap text-sm">{p.recordedBy}</TableCell>
               <TableCell>
                 {p.verified ? (
                   <Badge variant="success">Verified</Badge>
@@ -308,12 +299,14 @@ export function PaymentsTable({
                   <Badge variant="warning">Awaiting verification</Badge>
                 )}
               </TableCell>
-              <TableCell className="text-right">
-                <div className="flex justify-end gap-2">
-                  {actions?.(p)}
-                  <ReceiptButton payment={p} guestPhone={guestPhone} label="PDF" />
-                </div>
-              </TableCell>
+              {showRowActions && (
+                <TableCell className="text-right">
+                  <div className="flex justify-end gap-2">
+                    {actions?.(p)}
+                    <ReceiptButton payment={p} guestPhone={guestPhone} label="PDF" />
+                  </div>
+                </TableCell>
+              )}
             </TableRow>
           ))}
         </TableBody>
@@ -404,6 +397,26 @@ export function PaymentDetailDialog({
   deep?: boolean;
 }) {
   if (!payment) return null;
+  return <PaymentDetailBody payment={payment} onClose={onClose} nested={nested} deep={deep} />;
+}
+
+function PaymentDetailBody({
+  payment,
+  onClose,
+  nested,
+  deep,
+}: {
+  payment: Payment;
+  onClose: () => void;
+  nested: boolean;
+  deep: boolean;
+}) {
+  const { session } = useAuth();
+  const canVerify = session?.user.role === "finance" || session?.user.role === "owner";
+  const verify = useAction(() => paymentsService.verify(payment.id), {
+    success: `Payment ${payment.receiptNumber} verified.`,
+    onSuccess: onClose,
+  });
 
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
@@ -452,7 +465,16 @@ export function PaymentDetailDialog({
           />
           {payment.note && <Field label="Note" value={payment.note} />}
         </Panel>
-        <div className="flex justify-end">
+        <div className="flex flex-wrap justify-end gap-2">
+          {canVerify && !payment.verified && (
+            <Button
+              variant="success"
+              onClick={() => verify.mutate(undefined)}
+              disabled={verify.isPending}
+            >
+              {verify.isPending ? <Spinner className="h-4 w-4 text-current" /> : <BadgeCheck className="h-4 w-4" />} Verify payment
+            </Button>
+          )}
           <ReceiptButton payment={payment} label="Download PDF receipt" variant="default" />
         </div>
       </DialogContent>

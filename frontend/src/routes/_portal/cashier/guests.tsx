@@ -63,7 +63,7 @@ function GuestSearch() {
           description="Ask the Administrator to register the guest first."
         />
       )}
-      <div className="flex flex-wrap gap-4">
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
         {list.map((g, i) => (
           <Panel
             key={g.id}
@@ -72,7 +72,7 @@ function GuestSearch() {
             tabIndex={0}
             aria-label={`Start a transaction for ${g.fullName}`}
             aria-haspopup="dialog"
-            className="min-w-0 flex-grow basis-full cursor-pointer transition-colors hover:border-primary/40 hover:bg-muted/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:basis-[calc(50%_-_0.5rem)] xl:basis-[calc(33.333%_-_0.667rem)]"
+            className="group min-w-0 cursor-pointer p-4 transition-colors hover:border-primary/40 hover:bg-muted/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:p-4"
             onClick={() => openNewTransaction(g.id)}
             onKeyDown={(event) => {
               if (event.target !== event.currentTarget) return;
@@ -82,25 +82,19 @@ function GuestSearch() {
               }
             }}
           >
-            <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+            <div className="flex items-center justify-between gap-3">
               <div className="min-w-0">
                 <h2 className="truncate font-display text-xl font-semibold">{g.fullName}</h2>
-                <p className="text-sm text-muted-foreground">
+                <p className="truncate text-sm text-muted-foreground">
                   @{g.username} · {g.phone}
                 </p>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex shrink-0 items-center gap-2">
                 <AccountStatusBadge status={g.status} />
-                <Button
-                  size="sm"
-                  aria-haspopup="dialog"
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    openNewTransaction(g.id);
-                  }}
-                >
-                  <PlusCircle className="h-4 w-4" /> New transaction
-                </Button>
+                <PlusCircle
+                  className="h-5 w-5 text-primary/60 transition-colors group-hover:text-primary"
+                  aria-hidden
+                />
               </div>
             </div>
           </Panel>

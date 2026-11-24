@@ -1,13 +1,9 @@
-# Haroni DCMS migration roadmap
+# Haroni DCMS roadmap
 
-- [x] Import archive source (design system, services, demo backend, brand assets)
-- [x] Fix strict TypeScript errors in services/mock/config/http
-- [x] Landing + role-based sign-in at /
-- [x] App shell with role navigation, profile page
-- [x] Admin portal: dashboard, users, guests, services, settings, audit, backup
-- [x] Cashier portal: dashboard, guest search, new transaction, pending & disputes, history, details
-- [x] Finance portal: dashboard, approvals, exceptions, price requests, guests (+detail), limits, historical, payments, payment history, reports, details
-- [x] Guest portal: dashboard, pending, history, debt, payments, receipts
-- [x] PDF receipts, debt statements, PDF/Excel reports
-- [x] Verify (types, tests, browser walk-through)
-- [ ] Live PHP backend URL (waiting on user: server web address; server must allow requests from the app's domain)
+- [x] Import archive source into Lovable (PHP backend preserved, sample data in preview)
+- [x] Typecheck clean, tests pass
+- [x] UI/UX pass: essential-column tables, clickable rows/cards -> detail+action modals
+- [x] UI/UX pass: unified compact modal design, clean nested modal stacking
+- [x] UI/UX pass: minimal sidebar (no category headers), dashboard toolbar alignment
+- [x] UI/UX pass: responsive check (mobile / desktop)
+- [ ] Live PHP backend online: user's server is http://localhost (XAMPP) — works when running the app locally (Vite /api proxy kept). Online preview/published app need a public HTTPS server address (waiting on user)
